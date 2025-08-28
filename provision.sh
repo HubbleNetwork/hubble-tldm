@@ -42,11 +42,11 @@ while [[ $# -gt 0 ]]; do
             ;;
         --help|-h)
             echo "Usage: $0 --device-id <id> --key <key> --board-id <board> [--provision-option <merge|serial>]"
-            echo "  --device-id    Device identifier (required)"
-            echo "  --key          Device key (required)"
-            echo "  --board-id     Board identifier (required, e.g., efr32mg24-dk)"
-            echo "  --provision-option Provision option (optional: merge|serial, default: merge)"
-            echo "  --help, -h     Show this help message"
+            echo "  --device-id         Device identifier (required)"
+            echo "  --key               Device key (required)"
+            echo "  --board-id          Board identifier (required, e.g., efr32mg24-dk)"
+            echo "  --provision-option  Provision option (optional: merge|serial, default: merge)"
+            echo "  --help, -h          Show this help message"
             exit 0
             ;;
         *)

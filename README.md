@@ -70,6 +70,7 @@ curl -s https://raw.githubusercontent.com/HubbleNetwork/hubble-tldm/refs/heads/m
 - **`--key`**: Cryptographic key for the device (base64 encoded)
 - **`--board-id`**: Board identifier (must be `xg24_ek2703a` or `nrf21540dk`)
 - **`--key-offset`**: (Optional) Memory offset where key should be stored (default: 0x2000)
+- **`--provision-option`** Provision option (optional: merge|serial, default: merge)
 
 ### Examples
 
