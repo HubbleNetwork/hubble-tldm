@@ -75,6 +75,9 @@ def provision_key(key_string: str, serial_port: str, base64_encoded: bool, devic
             print("[INFO] Using raw key string...")
             key_data = bytearray(key_string.encode('utf-8'))
             
+        if len(key_data) != 32:
+            print(f"[ERROR] Key size: {len(key_data)} bytes, need to use 32 bytes")
+            sys.exit(1)
         print(f"[INFO] Key size: {len(key_data)} bytes")
         
     except base64.binascii.Error as e:
