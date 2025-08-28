@@ -73,7 +73,7 @@ def patch_data(elf_file_path: str, data: bytes, symbol_name: str = "master_key")
 
         if sym_size not in (0, len(data)):
             print(
-                f"[ERROR]: symbol size is {sym_size} bytes, but {symbol_name} length is {len(data)}.", file=sys.stderr)
+                f"[ERROR] symbol size is {sym_size} bytes, but {symbol_name} length is {len(data)}.", file=sys.stderr)
             return 1
 
     with open(elf_file_path, "r+b") as wf:
@@ -103,7 +103,7 @@ def main():
         print(f"[INFO] Key size: {len(data)} bytes")
         
     except base64.binascii.Error as e:
-        print(f"[Error] Error decoding base64 key: {e}", file=sys.stderr)
+        print(f"[ERROR] Error decoding base64 key: {e}", file=sys.stderr)
         sys.exit(1)
 
     # patch the key
