@@ -20,6 +20,7 @@ DEVICE_ID=""
 KEY=""
 BOARD_ID=""
 JLINK_DEVICE=""
+PROVISION_OPTION="merge"
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -35,11 +36,16 @@ while [[ $# -gt 0 ]]; do
             BOARD_ID="$2"
             shift 2
             ;;
+        --provision-option)
+            PROVISION_OPTION="$2"
+            shift 2
+            ;;
         --help|-h)
-            echo "Usage: $0 --device-id <id> --key <key> --board-id <board>"
+            echo "Usage: $0 --device-id <id> --key <key> --board-id <board> [--provision-option <merge|serial>]"
             echo "  --device-id    Device identifier (required)"
             echo "  --key          Device key (required)"
             echo "  --board-id     Board identifier (required, e.g., efr32mg24-dk)"
+            echo "  --provision-option Provision option (optional: merge|serial, default: merge)"
             echo "  --help, -h     Show this help message"
             exit 0
             ;;
@@ -56,8 +62,14 @@ done
 # =============================================================================
 if [[ -z "$DEVICE_ID" ]] || [[ -z "$KEY" ]] || [[ -z "$BOARD_ID" ]]; then
     echo "[ERROR] --device-id, --key, and --board-id are required" >&2
-    echo "Usage: $0 --device-id <id> --key <key> --board-id <board>" >&2
+    echo "Usage: $0 --device-id <id> --key <key> --board-id <board> [--provision-option <merge|serial>]" >&2
     echo "Use --help for more information" >&2
+    exit 1
+fi
+
+# validate provision option
+if [[ "$PROVISION_OPTION" != "serial" && "$PROVISION_OPTION" != "merge" ]]; then
+    echo "[ERROR] --provision-option must be either 'serial' or 'merge' (got: $PROVISION_OPTION)" >&2
     exit 1
 fi
 
@@ -77,12 +89,12 @@ case "$BOARD_ID" in
 esac
 
 # Set firmware filename based on board ID
-FIRMWARE_HEX="${BOARD_ID}.hex"
+FIRMWARE_IMAGE="${PROVISION_OPTION}/${BOARD_ID}.elf"
 
 echo "[INFO] Starting device provisioning..."
 echo "[INFO] Device ID: $DEVICE_ID"
 echo "[INFO] Board ID: $BOARD_ID"
-echo "[INFO] Firmware: $FIRMWARE_HEX"
+echo "[INFO] Firmware: $FIRMWARE_IMAGE"
 
 # =============================================================================
 # Download and Extract JLink Tools
@@ -126,29 +138,17 @@ fi
 # =============================================================================
 # Download Firmware Image
 # =============================================================================
-if [[ -f "$FIRMWARE_HEX" ]]; then
+mkdir -p "$(dirname "$FIRMWARE_IMAGE")"
+
+if [[ -f "$FIRMWARE_IMAGE" ]]; then
     echo "[INFO] Firmware image already exists, skipping download"
 else
     echo "[INFO] Downloading firmware image for board: $BOARD_ID..."
-    if ! wget -q "$BASE_URL/$FIRMWARE_HEX" -O "$FIRMWARE_HEX"; then
-        echo "[ERROR] Failed to download firmware image: $FIRMWARE_HEX" >&2
-        echo "[ERROR] Make sure the firmware file exists at: $BASE_URL/$FIRMWARE_HEX" >&2
+    if ! wget -q "$BASE_URL/$FIRMWARE_IMAGE" -O "$FIRMWARE_IMAGE"; then
+        echo "[ERROR] Failed to download firmware image: $FIRMWARE_IMAGE" >&2
+        echo "[ERROR] Make sure the firmware file exists at: $BASE_URL/$FIRMWARE_IMAGE" >&2
         exit 1
     fi
-fi
-
-# =============================================================================
-# Flash Firmware
-# =============================================================================
-echo "[INFO] Flashing firmware using JLinkExe..."
-
-if ! printf "r\nloadfile $FIRMWARE_HEX\nr\ng\nqc\n" | JLinkExe \
-      -device "$JLINK_DEVICE" \
-      -if SWD \
-      -speed 4000 \
-      -autoconnect 1; then
-    echo "[ERROR] Firmware flashing failed" >&2
-    exit 1
 fi
 
 # =============================================================================
@@ -194,35 +194,62 @@ fi
 echo "[SUCCESS] Python environment setup completed"
 
 # =============================================================================
-# Serial Port Detection
+# Flash Firmware
 # =============================================================================
-echo "[INFO] Auto-detecting USB modem serial port..."
 
-# Find USB modem TTY devices
-usb_ttys=$(ls /dev/tty.usbmodem* 2>/dev/null | sort)
+# if using merge, then need to merge first before flash
+if [[ "$PROVISION_OPTION" == "merge" ]]; then
+    echo "[INFO] Merging device ID and key into firmware image..."
+    if ! python3 embed-key.py "$FIRMWARE_IMAGE" --key "$KEY"; then
+        echo "[ERROR] Failed to merge device ID and key into firmware" >&2
+        exit 1
+    fi
+    echo "[SUCCESS] Merged device ID and key into firmware image"
+fi
 
-if [[ -z "$usb_ttys" ]]; then
-    echo "[ERROR] No USB modem TTY devices found" >&2
-    echo "[INFO] Please ensure your device is connected via USB" >&2
-    echo "[INFO] Available TTY devices:" >&2
-    ls /dev/tty* 2>/dev/null | sort >&2
+echo "[INFO] Flashing firmware using JLinkExe..."
+if ! printf "r\nloadfile $FIRMWARE_IMAGE\nr\ng\nqc\n" | JLinkExe \
+      -device "$JLINK_DEVICE" \
+      -if SWD \
+      -speed 4000 \
+      -autoconnect 1; then
+    echo "[ERROR] Firmware flashing failed" >&2
     exit 1
 fi
 
-# Select the first USB modem TTY device
-SERIAL_PORT=$(echo "$usb_ttys" | head -n 1)
-echo "[SUCCESS] Using serial port: $SERIAL_PORT"
+# =============================================================================
+# Serial Port Detection (if using serial provisioning)
+# =============================================================================
+if [[ "$PROVISION_OPTION" == "serial" ]]; then
+
+    echo "[INFO] Auto-detecting USB modem serial port..."
+
+    # Find USB modem TTY devices
+    usb_ttys=$(ls /dev/tty.usbmodem* 2>/dev/null | sort)
+
+    if [[ -z "$usb_ttys" ]]; then
+        echo "[ERROR] No USB modem TTY devices found" >&2
+        echo "[INFO] Please ensure your device is connected via USB" >&2
+        echo "[INFO] Available TTY devices:" >&2
+        ls /dev/tty* 2>/dev/null | sort >&2
+        exit 1
+    fi
+
+    # Select the first USB modem TTY device
+    SERIAL_PORT=$(echo "$usb_ttys" | head -n 1)
+    echo "[SUCCESS] Using serial port: $SERIAL_PORT"
 
 # =============================================================================
 # Run Python Provisioning
 # =============================================================================
-echo "[INFO] Running Python provisioning with device ID and key..."
-echo "[INFO] Using serial port: $SERIAL_PORT"
-echo "[INFO] Using Python from virtual environment: $(which python3)"
+    echo "[INFO] Running Python provisioning with device ID and key..."
+    echo "[INFO] Using serial port: $SERIAL_PORT"
+    echo "[INFO] Using Python from virtual environment: $(which python3)"
 
-if ! python3 "$PYTHON_SCRIPT" --base64 "$KEY" "$SERIAL_PORT" "$JLINK_DEVICE"; then
-    echo "[ERROR] Python provisioning failed" >&2
-    exit 1
+    if ! python3 "$PYTHON_SCRIPT" --base64 "$KEY" "$SERIAL_PORT" "$JLINK_DEVICE"; then
+        echo "[ERROR] Python provisioning failed" >&2
+        exit 1
+    fi
 fi
 
 echo "[SUCCESS] Device programmed successfully!"
