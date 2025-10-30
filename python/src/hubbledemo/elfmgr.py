@@ -8,9 +8,9 @@ import base64
 import requests
 import time
 import tempfile
-import pylink
+import subprocess
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Optional
 from elftools.elf.elffile import ELFFile
 from elftools.elf.sections import SymbolTableSection
 
@@ -19,14 +19,21 @@ _ELF_BASE_URL = (
     "https://raw.githubusercontent.com/HubbleNetwork/hubble-tldm/master/merge"
 )
 
-# Map boards to J-Link "device" strings (extend as needed)
-_BOARD_TO_JLINK_DEVICE: Dict[str, str] = {
-    "nrf52dk": "nRF52832_xxAA",
-    "nrf52840dk": "nRF52840_xxAA",
-    "nrf21540dk": "nRF52840_xxAA",
-    "xg24_ek2703a": "EFR32MG24BxxxF1536",
-    "xg22_ek4108a": "EFR32MG22CxxxF512",
+# Map boards to OpenOCD config files
+# These boards work with both J-Link and CMSIS-DAP probes
+_BOARD_TO_OPENOCD_CFG: Dict[str, list[str]] = {
+    "nrf52dk": ["target/nrf52.cfg"],
+    "nrf52840dk": ["target/nrf52.cfg"],
+    "nrf21540dk": ["target/nrf52.cfg"],
+    "xg24_ek2703a": ["target/efm32.cfg"],
+    "xg22_ek4108a": ["target/efm32.cfg"],
 }
+
+# Supported debug interface configs (in order of preference)
+_DEBUG_INTERFACES = [
+    "interface/jlink.cfg",
+    "interface/cmsis-dap.cfg",
+]
 
 
 def _compute_file_offset(sym, sec) -> int:
@@ -92,81 +99,141 @@ def patch_elf(buf: io.BytesIO, device: Device):
     _patch_symbol(buf, utc_ms.to_bytes(8, endian, signed=False), "utc_time")
 
 
-def _addr_for_segment(seg) -> int:
-    """
-    Choose a programming address for a PT_LOAD segment.
-    Prefer physical address (p_paddr) if present, else virtual (p_vaddr).
-    """
-    try:
-        paddr = int(seg["p_paddr"])
-    except Exception:
-        paddr = 0
-    vaddr = int(seg["p_vaddr"])
-    return paddr if paddr else vaddr
-
-
-def _always_unsecure(title, msg, flags):
-    # proceed with mass erase + unlock
-    return pylink.enums.JLinkFlags.DLG_BUTTON_YES
-
-
 def probe_device() -> bool:
-    """Returns if any emulators are connected"""
-    jlink = pylink.JLink(unsecure_hook=_always_unsecure)
-    return jlink.num_connected_emulators() > 0
+    """
+    Check if a debug probe (J-Link or CMSIS-DAP) is connected using OpenOCD.
+    
+    Returns:
+        bool: True if a debug probe is detected, False otherwise.
+    """
+    # Try each supported interface
+    for interface in _DEBUG_INTERFACES:
+        try:
+            result = subprocess.run(
+                [
+                    "openocd",
+                    "-f", interface,
+                    "-c", "transport select swd",
+                    "-c", "adapter speed 4000",
+                    "-c", "init",
+                    "-c", "exit"
+                ],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            if result.returncode == 0:
+                return True
+        except (subprocess.TimeoutExpired, FileNotFoundError):
+            return False
+        except Exception:
+            continue
+    
+    return False
 
 
 def flash_elf(buf: io.BytesIO, board: str) -> None:
     """
-    Flash an ELF image (held in a BytesIO) to an nRF52832_xxAA using pylink.
-    Creates a temporary .elf on disk (needed by jlink.flash_file) and deletes it afterwards.
+    Flash an ELF image (held in a BytesIO) to a target board using OpenOCD.
+    Creates a temporary .elf on disk and deletes it afterwards.
+    Automatically detects J-Link or CMSIS-DAP debug probes.
 
     Args:
         buf: io.BytesIO positioned anywhere (we'll rewind it).
-        board: board name
+        board: board name (e.g., 'nrf52dk', 'nrf52840dk', 'xg24_ek2703a')
 
     Raises:
-        ImportError: pylink not installed.
-        RuntimeError: on J-Link connection or flashing failure.
+        ValueError: if board is not supported.
+        RuntimeError: on OpenOCD connection or flashing failure.
     """
-    speed_khz = 4000
-    device = _BOARD_TO_JLINK_DEVICE.get(board.strip().lower())
+    board_key = board.strip().lower()
+    target_configs = _BOARD_TO_OPENOCD_CFG.get(board_key)
+    
+    if not target_configs:
+        raise ValueError(
+            f"Unsupported board: {board}. "
+            f"Supported boards: {', '.join(_BOARD_TO_OPENOCD_CFG.keys())}"
+        )
 
-    # Write the buffer to a real temp file so flash_file can read it (works on all OSes)
+    # Write the buffer to a temporary file
     tmp_path = None
     try:
         with tempfile.NamedTemporaryFile(delete=False, suffix=".elf") as tmp:
             tmp_path = tmp.name
             buf.seek(0)
-            # Stream copy to avoid duplicating memory with getvalue()
-            while True:
-                chunk = buf.read(1024 * 1024)
-                if not chunk:
-                    break
-                tmp.write(chunk)
+            tmp.write(buf.read())
             tmp.flush()
 
-        # jlink will silently fail post-mandated FW update of the jlink
-        # for some devices due to a security dialog which pylink ignores.
-        # This unsecure_hook just makes it accept the insecurity.
-        jlink = pylink.JLink(unsecure_hook=_always_unsecure)
+        # Try each debug interface until one works
+        errors = []
+        for interface in _DEBUG_INTERFACES:
+            # Build OpenOCD command with correct order:
+            # 1. Load interface
+            # 2. Configure transport and speed BEFORE target
+            # 3. Load target
+            # 4. Init and flash
+            cmd = [
+                "openocd",
+                "-f", interface,
+                "-c", "transport select swd",
+                "-c", "adapter speed 4000"
+            ]
+            for cfg in target_configs:
+                cmd.extend(["-f", cfg])
+            cmd.extend([
+                "-c", "init",
+                "-c", "targets",
+                "-c", "reset halt",
+                "-c", f"flash write_image erase {tmp_path}",
+                "-c", "reset run",
+                "-c", "exit"
+            ])
 
-        try:
-            jlink.open()
-            jlink.set_tif(pylink.enums.JLinkInterfaces.SWD)
-            jlink.connect(device, speed=speed_khz)
-
-            jlink.halt()
-            jlink.flash_file(tmp_path, addr=None)  # ELF contains its own load addresses
-            jlink.reset()
-        except Exception as e:
-            raise RuntimeError(f"Flashing failed: {e}") from e
-        finally:
+            # Execute OpenOCD
             try:
-                if jlink.opened():
-                    jlink.close()
-            except Exception:
-                pass
+                result = subprocess.run(
+                    cmd,
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                    timeout=30
+                )
+                # Success! Return without trying other interfaces
+                return
+            except subprocess.CalledProcessError as e:
+                # Save error and try next interface
+                interface_name = interface.split('/')[-1].replace('.cfg', '')
+                errors.append({
+                    'interface': interface_name,
+                    'cmd': ' '.join(cmd),
+                    'returncode': e.returncode,
+                    'stderr': e.stderr
+                })
+                continue
+            except subprocess.TimeoutExpired as e:
+                raise RuntimeError(f"OpenOCD flashing timed out after 30 seconds") from e
+            except FileNotFoundError as e:
+                raise RuntimeError(
+                    "OpenOCD not found. Please install OpenOCD:\n"
+                    "  macOS: brew install openocd\n"
+                    "  Linux: sudo apt-get install openocd\n"
+                    "  Windows: https://openocd.org/pages/getting-openocd.html"
+                ) from e
+
+        # If we get here, all interfaces failed
+        if errors:
+            error_details = "\n\n".join([
+                f"Interface: {err['interface']}\n"
+                f"Return code: {err['returncode']}\n"
+                f"Error: {err['stderr'].strip()}"
+                for err in errors
+            ])
+            raise RuntimeError(
+                f"OpenOCD flashing failed with all interfaces:\n\n{error_details}"
+            )
+        else:
+            raise RuntimeError("No compatible debug probe found")
+
     finally:
         if tmp_path:
             try:
@@ -220,6 +287,7 @@ def fetch_elf(board: str, timeout: float = 20.0) -> io.BytesIO:
 
     _RETRY_STATUS = {429, 500, 502, 503, 504}
     retries = 5
+    backoff = 1.0  # Initial backoff time in seconds
 
     last_err: Optional[Exception] = None
     for attempt in range(1, max(1, retries) + 1):
