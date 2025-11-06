@@ -8,6 +8,8 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#include "bt_time_service.h"
+
 #include "key.c"
 #include "utc.c"
 
@@ -76,6 +78,17 @@ int main(void)
 		LOG_ERR("Bluetooth init failed (err %d)", err);
 		return err;
 	}
+
+#ifdef CONFIG_HUBBLE_TIME_SYNC
+	int64_t current_time;
+
+	current_time = bt_time_sync(K_FOREVER);
+	if (current_time < 0) {
+		LOG_ERR("Time sync failed (err %d)", err);
+		return current_time;
+	}
+	utc_time = (uint64_t)current_time;
+#endif
 
 	err = hubble_ble_init(utc_time);
 	if (err != 0) {

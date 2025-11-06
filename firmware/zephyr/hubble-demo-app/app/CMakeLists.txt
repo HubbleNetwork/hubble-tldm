@@ -6,3 +6,4 @@ find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 project(hubble-demo-app)
 
 target_sources(app PRIVATE src/main.c)
+target_sources_ifdef(CONFIG_HUBBLE_TIME_SYNC app PRIVATE src/bt_time_service.c)

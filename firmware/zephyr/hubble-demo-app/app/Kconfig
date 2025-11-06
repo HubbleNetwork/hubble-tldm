@@ -10,6 +10,11 @@ menu "Zephyr"
 source "Kconfig.zephyr"
 endmenu
 
+config HUBBLE_TIME_SYNC
+	   bool "Use Hubble UUID to time sync service"
+	   help
+		Enable a service to sync time with Hubble Connect App
+
 module = APP
 module-str = APP
 source "subsys/logging/Kconfig.template.log_config"
