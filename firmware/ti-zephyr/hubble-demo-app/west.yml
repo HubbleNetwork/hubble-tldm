@@ -1,0 +1,24 @@
+# Copyright (c) 2024 HubbleNetwork
+# SPDX-License-Identifier: Apache-2.0
+
+manifest:
+
+  remotes:
+    - name: simplelink-zephyr
+      url-base: https://github.com/TexasInstruments
+    - name: hubble
+      url-base: https://github.com/HubbleNetwork
+
+
+  projects:
+    - name: simplelink-zephyr
+      remote: simplelink-zephyr
+      revision: v3.7.0-ti-9.10
+      path: zephyr
+      import: true
+      west-commands: scripts/west-commands.yml
+    - name: hubblenetwork-sdk
+      repo-path: sdk
+      revision: main
+      path: modules/lib/hubblenetwork-sdk
+      remote: hubble
