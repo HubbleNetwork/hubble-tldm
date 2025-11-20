@@ -1,16 +1,10 @@
 from __future__ import annotations
-
+from typing import Optional
 import click
 import os
-import json
-import time
-import base64
-import sys
 import petname
-from datetime import timezone, datetime
-from typing import Optional
-from hubblenetwork import Organization, Credentials
-from hubbledemo import flash_elf, fetch_elf, patch_elf, probe_device
+import hubbledemo
+from hubblenetwork import Organization
 
 
 def _get_env_or_fail(name: str) -> str:
@@ -40,7 +34,7 @@ def cli() -> None:
 
 @cli.command("probe")
 def probe() -> None:
-    if probe_device():
+    if hubbledemo.probe_device():
         click.echo("[SUCCESS] Device detected.")
     else:
         click.secho(
@@ -70,7 +64,16 @@ def probe() -> None:
     help="Token (if not using HUBBLE_API_TOKEN env var)",
 )
 def flash(board: str, name: str = None, org_id: str = None, token: str = None) -> None:
-    if not probe_device():
+    click.secho("[INFO] Getting metadata... ", nl=False)
+    metadata = hubbledemo.fetch_metadata()
+    click.secho("[SUCCESS]")
+
+    if board not in metadata:
+        click.secho("[ERROR] Unsupported board selected!", fg="red",err=True)
+        return 2
+
+    # If using jlink, we want to make sure early on that a device is connected
+    if metadata[board]["method"] == "jlink-flash" and not hubbledemo.probe_device():
         click.secho(
             "[ERROR] Failed to connect to device. Check your connection.",
             fg="red",
@@ -79,15 +82,15 @@ def flash(board: str, name: str = None, org_id: str = None, token: str = None) -
         return 2
 
     org_id, token = _get_org_and_token(org_id, token)
-    org = Organization(Credentials(org_id=org_id, api_token=token))
+    org = Organization(org_id=org_id, api_token=token)
 
-    click.secho(f"[INFO] Organization info acquired:")
+    click.secho("[INFO] Organization info acquired:")
     click.secho(f"\tID: {org.credentials.org_id}")
     click.secho(f"\tName: {org.name}")
     click.secho(f"\tEnvironment: {org.env.name}")
 
-    click.secho(f'[INFO] Registering new device"... ', nl=False)
-    device = org.register_device()
+    click.secho('[INFO] Registering new device"... ', nl=False)
+    device = org.register_device(encryption=metadata[board]["encryption"] if "encryption" in metadata[board] else None)
     click.secho("[SUCCESS]")
     click.secho(f"\tDevice ID:  {device.id}")
     click.secho(f"\tDevice Key: {device.key}")
@@ -95,24 +98,39 @@ def flash(board: str, name: str = None, org_id: str = None, token: str = None) -
     if not name:
         name = petname.generate(words=3)
         click.secho(f'[INFO] No name supplied. Naming device "{name}"')
-    click.secho(f"[INFO] Setting device name... ", nl=False)
+    click.secho("[INFO] Setting device name... ", nl=False)
     org.set_device_name(device_id=device.id, name=name)
     click.secho("[SUCCESS]")
 
     click.secho(f"[INFO] Retrieving binary for {board}... ", nl=False)
-    buf = fetch_elf(board=board)
+    buf = hubbledemo.fetch_elf(board=board)
     click.secho("[SUCCESS]")
 
     click.secho("[INFO] Patching key + UTC into binary... ", nl=False)
-    patch_elf(buf, device)
+    hubbledemo.patch_elf(buf, device)
     click.secho("[SUCCESS]")
 
-    click.secho("[INFO] Flashing binary onto device... ", nl=False)
-    flash_elf(board=board, buf=buf)
-    click.secho("[SUCCESS]")
+    # Depending on method, deliver how we will do provisioning.
+    if metadata[board]["method"] == "jlink-flash":
+        click.secho("[INFO] Flashing binary onto device... ", nl=False)
+        hubbledemo.flash_elf(board=board, buf=buf, jlink_device=metadata["jlink_device"])
+        click.secho("[SUCCESS]")
 
-    click.secho(f"\n{board} successfully flashed and provisioned!")
-
+        click.secho(f"\n{board} successfully flashed and provisioned!")
+    elif metadata[board]["method"] == "generate-hex":
+        click.secho("[INFO] Generating hex file... ", nl=False)
+        hubbledemo.convert_elf_to_hex(buf=buf, filename=name)
+        click.secho("[SUCCESS]")
+        click.secho(
+            f"\nHex file written to \"{os.getcwd()}/{name}.hex\"",
+            bg='blue', fg='white')
+    else:
+        click.secho(
+            "[ERROR] Unknown method for provisioning board.",
+            fg="red",
+            err=True,
+        )
+        return 2
 
 def main(argv: Optional[list[str]] = None) -> int:
     """
@@ -129,7 +147,6 @@ def main(argv: Optional[list[str]] = None) -> int:
         click.secho(f"Unexpected error: {e}", fg="red", err=True)
         return 2
     return 0
-
 
 if __name__ == "__main__":
     # Forward command-line args (excluding the program name) to main()

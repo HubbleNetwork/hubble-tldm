@@ -5,29 +5,12 @@ from hubblenetwork import Device
 import io
 import os
 import base64
-import requests
 import time
 import tempfile
 import pylink
-from pathlib import Path
-from typing import Dict
 from elftools.elf.elffile import ELFFile
 from elftools.elf.sections import SymbolTableSection
-
-
-_ELF_BASE_URL = (
-    "https://raw.githubusercontent.com/HubbleNetwork/hubble-tldm/master/merge"
-)
-
-# Map boards to J-Link "device" strings (extend as needed)
-_BOARD_TO_JLINK_DEVICE: Dict[str, str] = {
-    "nrf52dk": "nRF52832_xxAA",
-    "nrf52840dk": "nRF52840_xxAA",
-    "nrf21540dk": "nRF52840_xxAA",
-    "xg24_ek2703a": "EFR32MG24BxxxF1536",
-    "xg22_ek4108a": "EFR32MG22CxxxF512",
-    "lp_em_cc2340r5": "CC2340R5",
-}
+from intelhex import IntelHex
 
 
 def _compute_file_offset(sym, sec) -> int:
@@ -117,7 +100,7 @@ def probe_device() -> bool:
     return jlink.num_connected_emulators() > 0
 
 
-def flash_elf(buf: io.BytesIO, board: str) -> None:
+def flash_elf(buf: io.BytesIO, board: str, jlink_device) -> None:
     """
     Flash an ELF image (held in a BytesIO) to an nRF52832_xxAA using pylink.
     Creates a temporary .elf on disk (needed by jlink.flash_file) and deletes it afterwards.
@@ -131,7 +114,6 @@ def flash_elf(buf: io.BytesIO, board: str) -> None:
         RuntimeError: on J-Link connection or flashing failure.
     """
     speed_khz = 4000
-    device = _BOARD_TO_JLINK_DEVICE.get(board.strip().lower())
 
     # Write the buffer to a real temp file so flash_file can read it (works on all OSes)
     tmp_path = None
@@ -155,7 +137,7 @@ def flash_elf(buf: io.BytesIO, board: str) -> None:
         try:
             jlink.open()
             jlink.set_tif(pylink.enums.JLinkInterfaces.SWD)
-            jlink.connect(device, speed=speed_khz)
+            jlink.connect(jlink_device, speed=speed_khz)
 
             jlink.halt()
             jlink.flash_file(tmp_path, addr=None)  # ELF contains its own load addresses
@@ -175,88 +157,23 @@ def flash_elf(buf: io.BytesIO, board: str) -> None:
             except OSError:
                 pass
 
+def convert_elf_to_hex(buf: io.BytesIO, filename: str):
+    ih = IntelHex()
 
-def fetch_elf(board: str, timeout: float = 20.0) -> io.BytesIO:
-    """
-    Download the board-specific ELF from HubbleNetwork/hubble-tldm/merge and
-    return it as an io.BytesIO.
+    buf.seek(0)
+    elf = ELFFile(buf)
 
-    Parameters
-    ----------
-    board_name : str
-        Board identifier (e.g. 'nrf21540dk', 'xg24_ek2703a', 'xg22_ek4108a').
-    timeout : float
-        Requests timeout in seconds (connect + read).
+    for segment in elf.iter_segments():
+        if segment["p_type"] != "PT_LOAD":
+            continue
 
-    Returns
-    -------
-    io.BytesIO
-        Raw bytes of the .elf file
+        data = segment.data()
+        # Prefer physical address if present, otherwise virtual
+        addr = segment['p_paddr'] if segment['p_paddr'] != 0 else segment['p_vaddr']
 
-    Raises
-    ------
-    ValueError
-        If the board is not supported or name is malformed.
-    FileNotFoundError
-        If the expected ELF file does not exist in the merge directory.
-    ConnectionError
-        On network, HTTP, or parsing failures.
-    """
-    if not isinstance(board, str) or not board.strip():
-        raise ValueError("board must be a non-empty string")
+        # Store bytes into IntelHex at the proper address
+        for offset, b in enumerate(data):
+            ih[addr + offset] = b
+        #ih.frombytes(data, offset=addr)
 
-    # If we have a local override, just use that
-    local_file = os.getenv("HUBBLE_DEMO_ELF_FILE")
-    if local_file:
-        return io.BytesIO(Path(local_file).read_bytes())
-
-    # Give option (for development) to pull binary from elsewhere
-    val = os.getenv("HUBBLE_DEMO_ELF_URL_OVERRIDE")
-    if val:
-        base_url = val
-    else:
-        base_url = _ELF_BASE_URL
-
-    url = f"{base_url}/{board}.elf"
-
-    _RETRY_STATUS = {429, 500, 502, 503, 504}
-    retries = 5
-
-    last_err: Optional[Exception] = None
-    for attempt in range(1, max(1, retries) + 1):
-        try:
-            resp = requests.get(url, timeout=timeout)
-
-            if resp.status_code == 404:
-                # Not found is definitive; don't bother retrying
-                raise FileNotFoundError(f"No ELF for board '{board}' at {url}")
-
-            # Retry transient status codes (unless it's the final attempt)
-            if resp.status_code in _RETRY_STATUS and attempt < retries:
-                sleep_s = backoff * (2 ** (attempt - 1))
-                time.sleep(sleep_s)
-                continue
-
-            # Raise for other non-OK codes
-            resp.raise_for_status()
-
-            # Basic sanity checks: content-type and size
-            ctype = (resp.headers.get("Content-Type") or "").lower()
-            if "html" in ctype:
-                raise ValueError(f"Expected ELF bytes, got {ctype} from {url}")
-
-            return io.BytesIO(resp.content)
-
-        except (requests.Timeout, requests.ConnectionError) as e:
-            last_err = e
-            if attempt < retries:
-                sleep_s = backoff * (2 ** (attempt - 1))
-                time.sleep(sleep_s)
-                continue
-            raise ConnectionError(f"Failed to download ELF from {url}: {e}") from e
-
-        except Exception as e:
-            raise
-
-    # Should not reach here; defensive:
-    raise ConnectionError(f"Failed to download ELF from {url}: {last_err}")
+    ih.write_hex_file(str(filename + ".hex"))

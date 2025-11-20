@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pyhubbledemo"
-version = "0.0.2"
+version = "0.0.3"
 requires-python = ">=3.9"
 authors = [
   { name="Paul Buckley", email="paul@hubble.com" },
@@ -22,6 +22,7 @@ dependencies = [
   "petname",
   "pylink-square",
   "pyelftools",
+  "intelhex",
   "pyhubblenetwork",
 ]
 

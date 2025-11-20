@@ -1,0 +1,32 @@
+{
+    "nrf52dk": {
+        "name": "Nordic nRF52 Development Kit",
+        "method": "jlink-flash",
+        "jlink_device": "nRF52832_xxAA"
+    },
+    "nrf52840dk": {
+        "name": "Nordic nRF52840 Development Kit",
+        "method": "jlink-flash",
+        "jlink_device": "nRF52840_xxAA"
+    },
+    "nrf21540dk": {
+        "name": "Nordic nRF21540 Development Kit",
+        "method": "jlink-flash",
+        "jlink_device": "nRF52840_xxAA"
+    },
+    "xg24_ek2703a": {
+        "name": "Silicon Labs EFR32MG24B Development Kit",
+        "method": "jlink-flash",
+        "jlink_device": "EFR32MG24BxxxF1536"
+    },
+    "xg22_ek4108a": {
+        "name": "Silicon Labs EFR32MG22C Development Kit",
+        "method": "jlink-flash",
+        "jlink_device": "EFR32MG22CxxxF512"
+    },
+    "lp_em_cc2340r5": {
+        "name": "Texas Instrument LP-EM-2340R5 Development Kit",
+        "method": "generate-hex",
+        "encryption": "AES-128-CTR"
+    }
+}
