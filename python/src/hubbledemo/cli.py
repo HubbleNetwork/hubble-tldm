@@ -113,7 +113,7 @@ def flash(board: str, name: str = None, org_id: str = None, token: str = None) -
     # Depending on method, deliver how we will do provisioning.
     if metadata[board]["method"] == "jlink-flash":
         click.secho("[INFO] Flashing binary onto device... ", nl=False)
-        hubbledemo.flash_elf(board=board, buf=buf, jlink_device=metadata["jlink_device"])
+        hubbledemo.flash_elf(board=board, buf=buf, jlink_device=metadata[board]["jlink_device"])
         click.secho("[SUCCESS]")
 
         click.secho(f"\n{board} successfully flashed and provisioned!")
