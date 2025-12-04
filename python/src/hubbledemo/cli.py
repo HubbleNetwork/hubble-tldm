@@ -131,6 +131,7 @@ def flash(board: str, name: str = None, org_id: str = None, token: str = None) -
             err=True,
         )
         return 2
+    return 0
 
 def main(argv: Optional[list[str]] = None) -> int:
     """
@@ -140,13 +141,13 @@ def main(argv: Optional[list[str]] = None) -> int:
     """
     try:
         # standalone_mode=False prevents Click from calling sys.exit itself.
-        cli.main(args=argv, prog_name="hubbledemo", standalone_mode=False)
+        retval = cli.main(args=argv, prog_name="hubbledemo", standalone_mode=False)
     except SystemExit as e:
         return int(e.code)
     except Exception as e:  # safety net to avoid tracebacks in user CLI
         click.secho(f"Unexpected error: {e}", fg="red", err=True)
         return 2
-    return 0
+    return retval
 
 if __name__ == "__main__":
     # Forward command-line args (excluding the program name) to main()
