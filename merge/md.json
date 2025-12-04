@@ -23,5 +23,10 @@
         "name": "Texas Instrument LP-EM-2340R5 Development Kit",
         "method": "generate-hex",
         "encryption": "AES-128-CTR"
+    },
+    "lp_em_cc2340r53": {
+        "name": "Texas Instrument LP-EM-2340R53 Development Kit",
+        "method": "generate-hex",
+        "encryption": "AES-128-CTR"
     }
 }
