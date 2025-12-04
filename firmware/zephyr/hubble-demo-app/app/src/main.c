@@ -1,4 +1,4 @@
-#include <hubble/ble.h>
+#include <hubble/hubble.h>
 #include <zephyr/kernel.h>
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/kernel.h>
@@ -91,7 +91,7 @@ int main(void)
 		return err;
 	}
 
-	err = hubble_ble_init(utc_time, master_key);
+	err = hubble_init(utc_time, master_key);
 	if (err != 0) {
 		LOG_ERR("Failed to initialize Hubble BLE Network");
 		goto end;

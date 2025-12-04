@@ -26,7 +26,12 @@ git clone https://github.com/HubbleNetwork/hubble-tldm.git
 
 Enter the correct directory:
 ```shell
-cd hubble-tldm/firmware/zephyr
+cd hubble-tldm/firmware/ti-zephyr
+```
+
+Set the Zephyr SDK version for TI's Zephyr version:
+```shell
+export ZEPHYR_SDK_INSTALL_DIR=/path/to/zephyr-sdk-0.16.9
 ```
 
 Optionally first create a Python venv:
