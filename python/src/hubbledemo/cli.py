@@ -48,6 +48,22 @@ def probe() -> None:
 @cli.command("flash")
 @click.argument("board", type=str)
 @click.option(
+    "--name",
+    "-n",
+    type=str,
+    default=None,
+    show_default=False,
+    help="Device name (if not provided, a random name will be generated)",
+)
+@click.option(
+    "--file",
+    "-f",
+    type=str,
+    default=None,
+    show_default=False,
+    help="Output path for hex file (only used with generate-hex method)",
+)
+@click.option(
     "--org-id",
     "-o",
     type=str,
@@ -63,7 +79,7 @@ def probe() -> None:
     show_default=False,  # show default in --help
     help="Token (if not using HUBBLE_API_TOKEN env var)",
 )
-def flash(board: str, name: str = None, org_id: str = None, token: str = None) -> None:
+def flash(board: str, name: str = None, file: str = None, org_id: str = None, token: str = None) -> None:
     click.secho("[INFO] Getting metadata... ", nl=False)
     metadata = hubbledemo.fetch_metadata()
     click.secho("[SUCCESS]")
@@ -119,10 +135,24 @@ def flash(board: str, name: str = None, org_id: str = None, token: str = None) -
         click.secho(f"\n{board} successfully flashed and provisioned!")
     elif metadata[board]["method"] == "generate-hex":
         click.secho("[INFO] Generating hex file... ", nl=False)
-        hubbledemo.convert_elf_to_hex(buf=buf, filename=name)
+        
+        # Determine output path
+        if file:
+            output_path = file
+        else:
+            output_path = f"{name}.hex"
+        
+        hubbledemo.convert_elf_to_hex(buf=buf, output_path=output_path)
         click.secho("[SUCCESS]")
+        
+        # Show absolute path if relative path was used
+        if not os.path.isabs(output_path):
+            full_path = os.path.join(os.getcwd(), output_path)
+        else:
+            full_path = output_path
+        
         click.secho(
-            f"\nHex file written to \"{os.getcwd()}/{name}.hex\"",
+            f"\nHex file written to \"{full_path}\"",
             bg='blue', fg='white')
     else:
         click.secho(
