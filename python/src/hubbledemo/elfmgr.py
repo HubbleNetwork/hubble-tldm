@@ -157,7 +157,14 @@ def flash_elf(buf: io.BytesIO, board: str, jlink_device) -> None:
             except OSError:
                 pass
 
-def convert_elf_to_hex(buf: io.BytesIO, filename: str):
+def convert_elf_to_hex(buf: io.BytesIO, output_path: str):
+    """
+    Convert an ELF file to Intel HEX format.
+    
+    Args:
+        buf: io.BytesIO containing the ELF file data
+        output_path: Path where the .hex file will be written (include .hex extension)
+    """
     ih = IntelHex()
 
     buf.seek(0)
@@ -174,6 +181,9 @@ def convert_elf_to_hex(buf: io.BytesIO, filename: str):
         # Store bytes into IntelHex at the proper address
         for offset, b in enumerate(data):
             ih[addr + offset] = b
-        #ih.frombytes(data, offset=addr)
 
-    ih.write_hex_file(str(filename + ".hex"))
+    # Ensure .hex extension if not provided
+    if not output_path.endswith('.hex'):
+        output_path = output_path + '.hex'
+    
+    ih.write_hex_file(output_path)
