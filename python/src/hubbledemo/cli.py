@@ -111,11 +111,12 @@ def flash(board: str, name: str = None, file: str = None, org_id: str = None, to
     click.secho(f"\tDevice ID:  {device.id}")
     click.secho(f"\tDevice Key: {device.key}")
 
+    # Generate device name if not provided
+    device_name = name if name else petname.generate(words=3)
     if not name:
-        name = petname.generate(words=3)
-        click.secho(f'[INFO] No name supplied. Naming device "{name}"')
+        click.secho(f'[INFO] No name supplied. Naming device "{device_name}"')
     click.secho("[INFO] Setting device name... ", nl=False)
-    org.set_device_name(device_id=device.id, name=name)
+    org.set_device_name(device_id=device.id, name=device_name)
     click.secho("[SUCCESS]")
 
     click.secho(f"[INFO] Retrieving binary for {board}... ", nl=False)
@@ -140,7 +141,9 @@ def flash(board: str, name: str = None, file: str = None, org_id: str = None, to
         if file:
             output_path = file
         else:
-            output_path = f"{name}.hex"
+            # Use the provided name or the device name for the hex filename
+            hex_filename = name if name else device_name
+            output_path = f"{hex_filename}.hex"
         
         hubbledemo.convert_elf_to_hex(buf=buf, output_path=output_path)
         click.secho("[SUCCESS]")
