@@ -14,6 +14,11 @@
         "method": "jlink-flash",
         "jlink_device": "nRF52840_xxAA"
     },
+    "nrf54l15dk": {
+        "name": "Nordic nRF54L15 Development Kit",
+        "method": "jlink-flash",
+        "jlink_device": "nRF54L15_M33"
+    },
     "bg22_ek4108a": {
         "name": "Silicon Labs EFR32BG22 Explorer Kit (BG22-EK4108A)",
         "method": "jlink-flash",
