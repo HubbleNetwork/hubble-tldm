@@ -4,8 +4,7 @@ import click
 import os
 import petname
 import hubbledemo
-from hubblenetwork import Organization
-
+from hubblenetwork import Device, Organization
 
 def _get_env_or_fail(name: str) -> str:
     val = os.getenv(name)
@@ -97,27 +96,31 @@ def flash(board: str, name: str = None, file: str = None, org_id: str = None, to
         )
         return 2
 
-    org_id, token = _get_org_and_token(org_id, token)
-    org = Organization(org_id=org_id, api_token=token)
-
-    click.secho("[INFO] Organization info acquired:")
-    click.secho(f"\tID: {org.credentials.org_id}")
-    click.secho(f"\tName: {org.name}")
-    click.secho(f"\tEnvironment: {org.env.name}")
-
-    click.secho('[INFO] Registering new device"... ', nl=False)
-    device = org.register_device(encryption=metadata[board]["encryption"] if "encryption" in metadata[board] else None)
-    click.secho("[SUCCESS]")
-    click.secho(f"\tDevice ID:  {device.id}")
-    click.secho(f"\tDevice Key: {device.key}")
-
-    # Generate device name if not provided
+    device_key = os.getenv("HUBBLE_DEVICE_KEY")
     device_name = name if name else petname.generate(words=3)
-    if not name:
-        click.secho(f'[INFO] No name supplied. Naming device "{device_name}"')
-    click.secho("[INFO] Setting device name... ", nl=False)
-    org.set_device_name(device_id=device.id, name=device_name)
-    click.secho("[SUCCESS]")
+
+    if device_key is not None:
+        device = Device(id=None, key=token)
+    else:
+        org_id, token = _get_org_and_token(org_id, token)
+        org = Organization(org_id=org_id, api_token=token)
+        click.secho("[INFO] Organization info acquired:")
+        click.secho(f"\tID: {org.credentials.org_id}")
+        click.secho(f"\tName: {org.name}")
+        click.secho(f"\tEnvironment: {org.env.name}")
+
+        click.secho('[INFO] Registering new device"... ', nl=False)
+        device = org.register_device(encryption=metadata[board]["encryption"] if "encryption" in metadata[board] else None)
+        click.secho("[SUCCESS]")
+        click.secho(f"\tDevice ID:  {device.id}")
+        click.secho(f"\tDevice Key: {device.key}")
+
+        # Generate device name if not provided
+        if not name:
+            click.secho(f'[INFO] No name supplied. Naming device "{device_name}"')
+        click.secho("[INFO] Setting device name... ", nl=False)
+        org.set_device_name(device_id=device.id, name=device_name)
+        click.secho("[SUCCESS]")
 
     click.secho(f"[INFO] Retrieving binary for {board}... ", nl=False)
     buf = hubbledemo.fetch_elf(board=board)
