@@ -1,0 +1,17 @@
+name: HITL Trigger
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  trigger-hitl-endpoint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger HITL Endpoint Testing
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.HITL_ENDPOINT_REPO }}
+          repository: hubblenetwork/hitl-endpoint
+          event-type: tldm-repo-pr
+          client-payload: '{"branch": "${{ github.head_ref || github.ref_name }}"}'
