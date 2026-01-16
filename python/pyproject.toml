@@ -24,6 +24,7 @@ dependencies = [
   "pyelftools",
   "intelhex",
   "pyhubblenetwork",
+  "requests",
 ]
 
 [project.scripts]
