@@ -69,7 +69,7 @@ def _patch_symbol(buf: io.BytesIO, data: bytes, symbol_name: str):
 
 
 def patch_elf(buf: io.BytesIO, device: Device):
-    _patch_symbol(buf, base64.b64decode(device.key), "master_key")
+    _patch_symbol(buf, device.key, "master_key")
 
     endian = _get_endianness_from_elf(buf)
     utc_ms = int(time.time() * 1000)
