@@ -2,6 +2,7 @@ from __future__ import annotations
 from typing import Optional
 import click
 import os
+import base64
 import petname
 import hubbledemo
 from hubblenetwork import Device, Organization
@@ -100,7 +101,8 @@ def flash(board: str, name: str = None, file: str = None, org_id: str = None, to
     device_name = name if name else petname.generate(words=3)
 
     if device_key is not None:
-        device = Device(id=None, key=token)
+        key_bytes = base64.b64decode(device_key)
+        device = Device(id=None, key=key_bytes)
     else:
         org_id, token = _get_org_and_token(org_id, token)
         org = Organization(org_id=org_id, api_token=token)
