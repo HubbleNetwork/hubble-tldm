@@ -13,12 +13,12 @@ manifest:
   projects:
     - name: simplelink-zephyr
       remote: simplelink-zephyr
-      revision: v3.7.0-ti-9.10
+      revision: v3.7.0-ti-9.14.00_ea
       path: zephyr
       import: true
       west-commands: scripts/west-commands.yml
     - name: hubblenetwork-sdk
       repo-path: sdk
-      revision: main
+      revision: v1.0.0
       path: modules/lib/hubblenetwork-sdk
       remote: hubble
