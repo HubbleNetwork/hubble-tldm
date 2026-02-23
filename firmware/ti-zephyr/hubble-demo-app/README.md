@@ -1,47 +1,55 @@
 # HubbleNetwork Demo Application
 
 
-## Getting Started
+## Prerequisites
 
-Before getting started, make sure you have a proper Zephyr development
-environment. Follow the official
-[Zephyr Getting Started Guide](https://docs.zephyrproject.org/latest/getting_started/index.html) to install dependencies (the rest of the steps are covered below).
+Make sure you have a proper Zephyr development environment. Follow the official
+[Zephyr Getting Started Guide](https://docs.zephyrproject.org/latest/getting_started/index.html) to install dependencies.
 
-### Additional steps for downstream TI Zephyr
+The TI downstream repository for Zephyr is [here](https://github.com/TexasInstruments/simplelink-zephyr/tree/v3.7.0-ti-9.10).
 
-The TI downstream repository for zephyr here [here](https://github.com/TexasInstruments/simplelink-zephyr/tree/v3.7.0-ti-9.10).
+Install SDK version 0.16.9 by following the instructions [here](https://docs.zephyrproject.org/latest/develop/toolchains/zephyr_sdk.html) (replace the version in those instructions with 0.16.9), then set the install directory:
 
-* Install SDK version 0.16.9 by following the instructions [here](https://docs.zephyrproject.org/latest/develop/toolchains/zephyr_sdk.html) (note to replace the vesion in the lines to 0.16.9)
-* Set the SDK install directory ```export ZEPHYR_SDK_INSTALL_DIR=/path/to/0.16.9-sdk```
-
-### Initialization
-
-To configure this project, run the following (skip the cloning steps if already cloned).
-
-Clone the repo:
-```shell
-# initialize my-workspace for the demo application (main branch)
-git clone https://github.com/HubbleNetwork/hubble-tldm.git
-```
-
-Enter the correct directory:
-```shell
-cd hubble-tldm/firmware/ti-zephyr
-```
-
-Set the Zephyr SDK version for TI's Zephyr version:
 ```shell
 export ZEPHYR_SDK_INSTALL_DIR=/path/to/zephyr-sdk-0.16.9
 ```
 
-Optionally first create a Python venv:
+Python 3.11 is required to use TI's `crc-tool` for adding a CRC to images. On macOS:
+
+```bash
+brew install python@3.11
+```
+
+
+## Setup
+
+Clone the repo:
 
 ```shell
-python -m venv .venv
+git clone https://github.com/HubbleNetwork/hubble-tldm.git
+```
+
+Enter the correct directory:
+
+```shell
+cd hubble-tldm/firmware/ti-zephyr
+```
+
+Create and activate a Python 3.11 virtual environment:
+
+```bash
+python3.11 -m venv .venv
 source .venv/bin/activate
 ```
 
-Then set up the west installation (```pip install west``` if not installed)
+Install TI's CRC tooling:
+
+```bash
+python -m pip install --upgrade pip setuptools wheel
+python -m pip install -r hubble-demo-app/requirements.txt
+```
+
+Set up the west installation:
 
 ```shell
 west init -l hubble-demo-app
@@ -54,7 +62,8 @@ west packages pip --install
 west sdk install
 ```
 
-### Building and running
+
+## Build & Flash
 
 To build the application, run the following command:
 
@@ -63,7 +72,7 @@ cd hubble-demo-app
 west build -b $BOARD app
 ```
 
-where `$BOARD` is the target board. 
+where `$BOARD` is the target board.
 
 A list of supported boards can be found via the `west boards` command.
 
