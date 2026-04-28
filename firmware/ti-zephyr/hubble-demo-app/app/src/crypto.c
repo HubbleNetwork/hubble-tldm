@@ -56,30 +56,30 @@ init_error:
 }
 
 int hubble_crypto_aes_ctr(const uint8_t key[CONFIG_HUBBLE_KEY_SIZE],
-			  uint8_t nonce_counter[HUBBLE_BLE_NONCE_BUFFER_LEN],
+			  uint8_t nonce_counter[HUBBLE_NONCE_BUFFER_SIZE],
 			  const uint8_t *data, size_t data_len, uint8_t *output)
 {
 	int ret;
 	uint8_t ctr;
-	uint8_t out[HUBBLE_BLE_NONCE_BUFFER_LEN + HUBBLE_AES_BLOCK_SIZE];
+	uint8_t out[HUBBLE_NONCE_BUFFER_SIZE + HUBBLE_AES_BLOCK_SIZE];
 	struct tc_aes_key_sched_struct sched;
 
 	if (data_len == 0) {
 		return 0;
 	}
 
-	memcpy(out, nonce_counter, HUBBLE_BLE_NONCE_BUFFER_LEN);
+	memcpy(out, nonce_counter, HUBBLE_NONCE_BUFFER_SIZE);
 
 	ret = tc_aes128_set_encrypt_key(&sched, key);
 	if (ret != TC_CRYPTO_SUCCESS) {
 		goto err;
 	}
 
-	if (tc_ctr_mode(&out[HUBBLE_BLE_NONCE_BUFFER_LEN], data_len, data,
+	if (tc_ctr_mode(&out[HUBBLE_NONCE_BUFFER_SIZE], data_len, data,
 			data_len, &ctr, &sched) == 0) {
 		goto err;
 	}
-	memcpy(output, &out[HUBBLE_BLE_NONCE_BUFFER_LEN], data_len);
+	memcpy(output, &out[HUBBLE_NONCE_BUFFER_SIZE], data_len);
 
 err:
 	hubble_crypto_zeroize(out, sizeof(out));
