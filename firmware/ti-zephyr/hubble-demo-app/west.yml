@@ -19,6 +19,6 @@ manifest:
       west-commands: scripts/west-commands.yml
     - name: hubblenetwork-sdk
       repo-path: sdk
-      revision: v1.0.0
+      revision: v2.0.0
       path: modules/lib/hubblenetwork-sdk
       remote: hubble
