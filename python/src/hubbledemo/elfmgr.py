@@ -5,7 +5,6 @@ from hubblenetwork import Device
 import io
 import os
 import base64
-import time
 import tempfile
 import pylink
 from elftools.elf.elffile import ELFFile
@@ -15,13 +14,6 @@ from intelhex import IntelHex
 
 def _compute_file_offset(sym, sec) -> int:
     return sec["sh_offset"] + (sym["st_value"] - sec["sh_addr"])
-
-
-def _get_endianness_from_elf(buf: io.BytesIO) -> str:
-    buf.seek(0)
-    elf = ELFFile(buf)
-    """Return 'little' or 'big' by inspecting the ELF header."""
-    return "little" if elf.little_endian else "big"
 
 
 def _find_symbol(elf: ELFFile, name: str):
@@ -70,10 +62,6 @@ def _patch_symbol(buf: io.BytesIO, data: bytes, symbol_name: str):
 
 def patch_elf(buf: io.BytesIO, device: Device):
     _patch_symbol(buf, device.key, "master_key")
-
-    endian = _get_endianness_from_elf(buf)
-    utc_ms = int(time.time() * 1000)
-    _patch_symbol(buf, utc_ms.to_bytes(8, endian, signed=False), "utc_time")
 
 
 def _addr_for_segment(seg) -> int:

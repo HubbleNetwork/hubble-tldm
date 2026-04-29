@@ -9,7 +9,6 @@
 #include <stdlib.h>
 
 #include "key.c"
-#include "utc.c"
 
 LOG_MODULE_REGISTER(main, CONFIG_APP_LOG_LEVEL);
 
@@ -91,7 +90,7 @@ int main(void)
 		return err;
 	}
 
-	err = hubble_init(utc_time, master_key);
+	err = hubble_init(0, master_key);
 	if (err != 0) {
 		LOG_ERR("Failed to initialize Hubble BLE Network");
 		goto end;
