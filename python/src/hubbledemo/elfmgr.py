@@ -4,7 +4,6 @@ from hubblenetwork import Device
 
 import io
 import os
-import base64
 import tempfile
 import pylink
 from elftools.elf.elffile import ELFFile
