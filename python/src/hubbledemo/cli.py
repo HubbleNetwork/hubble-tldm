@@ -115,7 +115,7 @@ def flash(board: str, name: str = None, file: str = None, org_id: str = None, to
         device = org.register_device(encryption=metadata[board]["encryption"] if "encryption" in metadata[board] else None)
         click.secho("[SUCCESS]")
         click.secho(f"\tDevice ID:  {device.id}")
-        click.secho(f"\tDevice Key: {device.key}")
+        click.secho(f"\tDevice Key: {base64.b64encode(device.key).decode('ascii')}")
 
         # Generate device name if not provided
         if not name:
