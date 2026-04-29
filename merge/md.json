@@ -2,36 +2,57 @@
     "nrf52dk": {
         "name": "Nordic nRF52 Development Kit",
         "method": "jlink-flash",
-        "jlink_device": "nRF52832_xxAA"
+        "jlink_device": "nRF52832_xxAA",
+        "workspace": "zephyr",
+        "board_target": "nrf52dk/nrf52832",
+        "artifact": "nrf52dk.elf"
     },
     "nrf52840dk": {
         "name": "Nordic nRF52840 Development Kit",
         "method": "jlink-flash",
-        "jlink_device": "nRF52840_xxAA"
+        "jlink_device": "nRF52840_xxAA",
+        "workspace": "zephyr",
+        "board_target": "nrf52840dk/nrf52840",
+        "artifact": "nrf52840dk.elf"
     },
     "nrf21540dk": {
         "name": "Nordic nRF21540 Development Kit",
         "method": "jlink-flash",
-        "jlink_device": "nRF52840_xxAA"
+        "jlink_device": "nRF52840_xxAA",
+        "workspace": "zephyr",
+        "board_target": "nrf21540dk/nrf52840",
+        "artifact": "nrf21540dk.elf"
     },
     "nrf54l15dk": {
         "name": "Nordic nRF54L15 Development Kit",
         "method": "jlink-flash",
-        "jlink_device": "nRF54L15_M33"
+        "jlink_device": "nRF54L15_M33",
+        "workspace": "zephyr",
+        "board_target": "nrf54l15dk/nrf54l15/cpuapp",
+        "artifact": "nrf54l15dk.elf"
     },
     "bg22_ek4108a": {
         "name": "Silicon Labs EFR32BG22 Explorer Kit (BG22-EK4108A)",
         "method": "jlink-flash",
-        "jlink_device": "EFR32BG22CXXXF512"
+        "jlink_device": "EFR32BG22CXXXF512",
+        "workspace": "zephyr",
+        "board_target": "bg22_ek4108a",
+        "artifact": "bg22_ek4108a.elf"
     },
     "lp_em_cc2340r5": {
         "name": "Texas Instrument LP-EM-2340R5 Development Kit",
         "method": "generate-hex",
-        "encryption": "AES-128-CTR"
+        "encryption": "AES-128-CTR",
+        "workspace": "ti-zephyr",
+        "board_target": "lp_em_cc2340r5",
+        "artifact": "lp_em_cc2340r5.elf"
     },
     "lp_em_cc2340r53": {
         "name": "Texas Instrument LP-EM-2340R53 Development Kit",
         "method": "generate-hex",
-        "encryption": "AES-128-CTR"
+        "encryption": "AES-128-CTR",
+        "workspace": "ti-zephyr",
+        "board_target": "lp_em_cc2340r53",
+        "artifact": "lp_em_cc2340r53.elf"
     }
 }

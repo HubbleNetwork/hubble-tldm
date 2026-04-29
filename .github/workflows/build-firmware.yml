@@ -1,0 +1,220 @@
+name: Build firmware ELFs
+
+on:
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: "Open a PR updating merge/*.elf with the build outputs"
+        type: boolean
+        default: false
+  pull_request:
+    paths:
+      - "firmware/**"
+      - "merge/md.json"
+      - ".github/workflows/build-firmware.yml"
+      - ".github/scripts/verify-firmware-elf.py"
+
+# Build jobs only need read; only the open-pr job pushes a branch.
+permissions:
+  contents: read
+
+# Cancel superseded PR builds; never cancel manual dispatches (releases).
+concurrency:
+  group: build-firmware-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # 0.17.x breaks the TI fork's libc-hooks.c (CLAUDE.md gotcha) — keep at 0.16.9.
+  ZEPHYR_SDK_VERSION_TI: "0.16.9"
+
+jobs:
+  setup-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      zephyr_matrix: ${{ steps.matrix.outputs.zephyr_matrix }}
+      ti_zephyr_matrix: ${{ steps.matrix.outputs.ti_zephyr_matrix }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate md.json build fields
+        run: |
+          missing=$(jq -r '
+            to_entries[]
+            | select((.value.workspace // "") == "" or (.value.board_target // "") == "" or (.value.artifact // "") == "")
+            | .key
+          ' merge/md.json)
+          if [ -n "$missing" ]; then
+            echo "::error::merge/md.json entries missing workspace/board_target/artifact: $missing"
+            exit 1
+          fi
+          unknown=$(jq -r '
+            to_entries[]
+            | select((.value.workspace | IN("zephyr", "ti-zephyr")) | not)
+            | "\(.key)=\(.value.workspace)"
+          ' merge/md.json)
+          if [ -n "$unknown" ]; then
+            echo "::error::merge/md.json has entries with unknown workspace (expected zephyr or ti-zephyr): $unknown"
+            exit 1
+          fi
+
+      - name: Build matrices from md.json
+        id: matrix
+        run: |
+          zephyr=$(jq -c '[to_entries[] | select(.value.workspace == "zephyr") | {key, board_target: .value.board_target, artifact: .value.artifact}]' merge/md.json)
+          ti=$(jq -c '[to_entries[] | select(.value.workspace == "ti-zephyr") | {key, board_target: .value.board_target, artifact: .value.artifact}]' merge/md.json)
+          echo "zephyr_matrix=$zephyr" >> "$GITHUB_OUTPUT"
+          echo "ti_zephyr_matrix=$ti" >> "$GITHUB_OUTPUT"
+          echo "Zephyr boards:    $zephyr"
+          echo "TI-Zephyr boards: $ti"
+
+  build-zephyr:
+    needs: setup-matrix
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        board: ${{ fromJSON(needs.setup-matrix.outputs.zephyr_matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - uses: zephyrproject-rtos/action-zephyr-setup@v1
+        with:
+          app-path: hubble-demo-app
+          base-path: firmware/zephyr
+          toolchains: arm-zephyr-eabi
+
+      # SiLabs boards (e.g. bg22_ek4108a) require a connectivity-firmware blob
+      # that west blobs treats as opt-in. Fetching unconditionally is a no-op
+      # for boards that don't need it.
+      - name: Fetch HAL blobs
+        working-directory: firmware/zephyr
+        run: west blobs fetch hal_silabs
+
+      - name: Build firmware
+        working-directory: firmware/zephyr
+        env:
+          BOARD_TARGET: ${{ matrix.board.board_target }}
+          ARTIFACT: ${{ matrix.board.artifact }}
+        run: |
+          west build -b "$BOARD_TARGET" -p always hubble-demo-app/app
+          cp build/zephyr/zephyr.elf "$GITHUB_WORKSPACE/$ARTIFACT"
+
+      - name: Verify ELF symbols
+        env:
+          ARTIFACT: ${{ matrix.board.artifact }}
+        run: python .github/scripts/verify-firmware-elf.py "$ARTIFACT"
+
+      - name: Upload ELF
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware-elfs-${{ matrix.board.key }}
+          path: ${{ matrix.board.artifact }}
+          if-no-files-found: error
+          retention-days: 14
+
+  build-ti-zephyr:
+    needs: setup-matrix
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        board: ${{ fromJSON(needs.setup-matrix.outputs.ti_zephyr_matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      # ti-simplelink-crc-tool is invoked by the TI Zephyr build for hex
+      # signing; pull it in before action-zephyr-setup runs west update.
+      - name: Install TI workspace Python requirements
+        run: pip install -r firmware/ti-zephyr/hubble-demo-app/requirements.txt
+
+      - uses: zephyrproject-rtos/action-zephyr-setup@v1
+        with:
+          app-path: hubble-demo-app
+          base-path: firmware/ti-zephyr
+          sdk-version: ${{ env.ZEPHYR_SDK_VERSION_TI }}
+          toolchains: arm-zephyr-eabi
+
+      - name: Build firmware
+        working-directory: firmware/ti-zephyr
+        env:
+          BOARD_TARGET: ${{ matrix.board.board_target }}
+          ARTIFACT: ${{ matrix.board.artifact }}
+        run: |
+          west build -b "$BOARD_TARGET" -p always hubble-demo-app/app
+          cp build/zephyr/zephyr.elf "$GITHUB_WORKSPACE/$ARTIFACT"
+
+      - name: Verify ELF symbols
+        env:
+          ARTIFACT: ${{ matrix.board.artifact }}
+        run: python .github/scripts/verify-firmware-elf.py "$ARTIFACT"
+
+      - name: Upload ELF
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware-elfs-${{ matrix.board.key }}
+          path: ${{ matrix.board.artifact }}
+          if-no-files-found: error
+          retention-days: 14
+
+  open-pr:
+    needs: [build-zephyr, build-ti-zephyr]
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.deploy }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all firmware ELFs into merge/
+        uses: actions/download-artifact@v4
+        with:
+          path: merge
+          pattern: firmware-elfs-*
+          merge-multiple: true
+
+      - name: Show pending changes
+        run: |
+          ls -la merge/
+          git status
+
+      - name: Build PR body
+        id: body
+        env:
+          RUN_ID: ${{ github.run_id }}
+          SERVER_URL: ${{ github.server_url }}
+          REPO: ${{ github.repository }}
+        run: |
+          {
+            echo "body<<PR_EOF"
+            echo "Automated rebuild of \`merge/*.elf\` from workflow run [#${RUN_ID}](${SERVER_URL}/${REPO}/actions/runs/${RUN_ID})."
+            echo
+            echo "**Boards rebuilt:**"
+            jq -r 'to_entries[] | "- `\(.key)` (\(.value.workspace)) → `\(.value.artifact)`"' merge/md.json
+            echo
+            echo "**Reviewer checklist** — merging publishes new firmware to every \`pyhubbledemo\` user:"
+            echo "- [ ] Diff contains only \`merge/*.elf\` changes"
+            echo "- [ ] Spot-check at least one ELF locally with \`hubbledemo flash\` against real hardware"
+            echo "- [ ] Confirm SDK versions in workflow match the intended release toolchain"
+            echo "PR_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create or update PR
+        uses: peter-evans/create-pull-request@v6
+        with:
+          branch: automated/firmware-build-${{ github.run_id }}
+          title: "chore(merge): rebuild firmware ELFs"
+          body: ${{ steps.body.outputs.body }}
+          add-paths: merge/*.elf
+          commit-message: "chore(merge): rebuild firmware ELFs from workflow ${{ github.run_id }}"
+          delete-branch: true
