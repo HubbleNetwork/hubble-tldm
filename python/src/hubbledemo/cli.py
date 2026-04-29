@@ -128,7 +128,7 @@ def flash(board: str, name: str = None, file: str = None, org_id: str = None, to
     buf = hubbledemo.fetch_elf(board=board)
     click.secho("[SUCCESS]")
 
-    click.secho("[INFO] Patching key + UTC into binary... ", nl=False)
+    click.secho("[INFO] Patching key into binary... ", nl=False)
     hubbledemo.patch_elf(buf, device)
     click.secho("[SUCCESS]")
 

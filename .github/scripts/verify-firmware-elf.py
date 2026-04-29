@@ -11,7 +11,7 @@ import sys
 from elftools.elf.elffile import ELFFile
 from elftools.elf.sections import SymbolTableSection
 
-REQUIRED_SYMBOLS = ("master_key", "utc_time")
+REQUIRED_SYMBOLS = ("master_key",)
 
 
 def find_symbol(elf: ELFFile, name: str):
