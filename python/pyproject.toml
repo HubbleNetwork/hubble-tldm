@@ -40,4 +40,22 @@ include = [
   "README.md",
   "LICENSE",
   "pyproject.toml",
+  "tests",
+]
+
+# ---- Testing & dev tooling ----
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+markers = [
+  "ble: tests that require BLE hardware/permissions",
+  "docker: tests that require a running Docker daemon",
+  "integration: slow or environment-dependent tests",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=7",
+  "pytest-cov",
+  "ruff",
 ]
