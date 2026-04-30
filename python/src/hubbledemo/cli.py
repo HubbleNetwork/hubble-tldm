@@ -5,7 +5,7 @@ import os
 import base64
 import petname
 import hubbledemo
-from hubblenetwork import Device, Organization
+from hubblenetwork import DEVICE_UPTIME, Device, Organization
 
 def _get_env_or_fail(name: str) -> str:
     val = os.getenv(name)
@@ -112,7 +112,10 @@ def flash(board: str, name: str = None, file: str = None, org_id: str = None, to
         click.secho(f"\tEnvironment: {org.env.name}")
 
         click.secho('[INFO] Registering new device"... ', nl=False)
-        device = org.register_device(encryption=metadata[board]["encryption"] if "encryption" in metadata[board] else None)
+        device = org.register_device(
+            encryption=metadata[board]["encryption"] if "encryption" in metadata[board] else None,
+            counter_source=DEVICE_UPTIME,
+        )
         click.secho("[SUCCESS]")
         click.secho(f"\tDevice ID:  {device.id}")
         click.secho(f"\tDevice Key: {base64.b64encode(device.key).decode('ascii')}")

@@ -23,7 +23,7 @@ dependencies = [
   "pylink-square",
   "pyelftools",
   "intelhex",
-  "pyhubblenetwork",
+  "pyhubblenetwork>=0.10.0",
   "requests",
 ]
 
