@@ -13,7 +13,7 @@ manifest:
   projects:
     - name: simplelink-zephyr
       remote: simplelink-zephyr
-      revision: v3.7.0-ti-9.14.00_ea
+      revision: v3.7.0-ti-9.14
       path: zephyr
       import: true
       west-commands: scripts/west-commands.yml

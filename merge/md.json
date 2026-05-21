@@ -54,5 +54,13 @@
         "workspace": "ti-zephyr",
         "board_target": "lp_em_cc2340r53",
         "artifact": "lp_em_cc2340r53.elf"
+    },
+    "lp_em_cc2755p10": {
+        "name": "Texas Instruments CC2755P10 LaunchPad",
+        "method": "generate-hex",
+        "encryption": "AES-128-CTR",
+        "workspace": "ti-zephyr",
+        "board_target": "lp_em_cc2755p10",
+        "artifact": "lp_em_cc2755p10.elf"
     }
 }
