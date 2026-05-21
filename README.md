@@ -42,3 +42,4 @@ pipx run pyhubbledemo flash <BOARD> -o <ORG_ID> -t <API_TOKEN>
 Currently supported boards:
 * nrf52dk
 * nrf52840dk
+* lp_em_cc2755p10

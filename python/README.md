@@ -30,7 +30,7 @@ pytest -s -m integration tests/test_e2e.py -v
 ```
 
 `-s` is required because TI `generate-hex` boards (`lp_em_cc2340r5`,
-`lp_em_cc2340r53`) emit a `.hex` and the test pauses to ask you to flash
+`lp_em_cc2340r53`, `lp_em_cc2755p10`) emit a `.hex` and the test pauses to ask you to flash
 it manually before continuing.
 
 #### Testing a locally-built ELF
