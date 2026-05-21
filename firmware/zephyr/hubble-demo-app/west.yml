@@ -12,7 +12,12 @@ manifest:
   projects:
     - name: zephyr
       remote: zephyrproject-rtos
-      revision: main
+      # Pin to a tagged release instead of tracking `main`. Tracking `main`
+      # drifted onto an upstream tree where Kconfig warnings are fatal
+      # (UART_CONSOLE vs. disabled uart0, and PSA_WANT_* crypto deps from the
+      # SDK), breaking the Nordic build. Mirrors the TI workspace, which also
+      # pins. Bump deliberately rather than letting `main` move under us.
+      revision: v4.4.0
       import: true
       west-commands: scripts/west-commands.yml
     - name: hubblenetwork-sdk
