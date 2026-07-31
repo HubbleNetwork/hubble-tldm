@@ -1,0 +1,29 @@
+# Copyright (c) 2026 HubbleNetwork
+# SPDX-License-Identifier: Apache-2.0
+
+manifest:
+
+  remotes:
+    - name: zephyrproject-rtos
+      url-base: https://github.com/zephyrproject-rtos
+    - name: hubble
+      url-base: https://github.com/HubbleNetwork
+
+  projects:
+    - name: zephyr
+      remote: zephyrproject-rtos
+      # Same pin as the BLE workspace (firmware/zephyr). The satellite SoC
+      # driver in the SDK selects its nrfx_timer reference on ZEPHYR_VERSION,
+      # and v4.4.0 is the branch it was validated against.
+      revision: v4.4.0
+      import: true
+      west-commands: scripts/west-commands.yml
+    - name: hubblenetwork-sdk
+      repo-path: sdk
+      # Pinned to a commit rather than a tag: satellite board support
+      # (port/zephyr/boards) and the satellite radio blobs landed after
+      # v2.0.0 and no release tag contains them yet. Move this to v2.1.0
+      # once the SDK cuts one.
+      revision: a71a6bc8c1bc939ded10dc7a7965c8b412d93680
+      path: modules/lib/hubblenetwork-sdk
+      remote: hubble
