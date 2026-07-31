@@ -2,7 +2,8 @@
 
 Continuously builds Hubble satellite packets and transmits them in a loop.
 This is the satellite counterpart to the BLE beacon in `firmware/zephyr`, and
-it produces the `nrf54l15dk_sat` image published in `merge/`.
+it produces the `nrf54l15dk_sat` and `nrf21540dk_sat` images published in
+`merge/`.
 
 The master key is a placeholder at build time and is patched into the ELF by
 `hubbledemo flash` after the device is registered with the Hubble cloud, so
@@ -76,8 +77,10 @@ To build the application, run the following command:
 
 ```shell
 cd hubble-sat-app
-west build -b nrf54l15dk/nrf54l15/cpuapp app
+west build -b $BOARD app
 ```
+
+where `$BOARD` is one of the targets in [Supported boards](#supported-boards).
 
 Once you have built the application, run the following command to flash it:
 
@@ -91,10 +94,12 @@ provisioned with a real device key.
 
 ## Supported boards
 
-| Board | Target |
-|-------|--------|
-| Nordic nRF54L15 DK | `nrf54l15dk/nrf54l15/cpuapp` |
+| Board | Target | Notes |
+|-------|--------|-------|
+| Nordic nRF54L15 DK | `nrf54l15dk/nrf54l15/cpuapp` | Uses the nRF54 blob |
+| Nordic nRF21540 DK | `nrf21540dk/nrf52840` | Uses the nRF52 blob; the SDK drives the on-board FEM around each transmission |
 
-The SDK also supports satellite on `nrf21540dk`, `thingy53/nrf5340/cpunet`,
+The SDK also supports satellite on `thingy53/nrf5340/cpunet`,
 `xg24_rb4187c`, and `xiao_mg24`. Adding one means adding an entry to
-`merge/md.json`; the CI matrix is generated from that file.
+`merge/md.json`; the CI matrix is generated from that file. The Silicon Labs
+targets additionally need `west blobs fetch hal_silabs` for the RAIL library.

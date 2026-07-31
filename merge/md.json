@@ -23,6 +23,14 @@
         "board_target": "nrf21540dk/nrf52840",
         "artifact": "nrf21540dk.elf"
     },
+    "nrf21540dk_sat": {
+        "name": "Nordic nRF21540 Development Kit (Satellite)",
+        "method": "jlink-flash",
+        "jlink_device": "nRF52840_xxAA",
+        "workspace": "sat-zephyr",
+        "board_target": "nrf21540dk/nrf52840",
+        "artifact": "nrf21540dk_sat.elf"
+    },
     "nrf54l15dk": {
         "name": "Nordic nRF54L15 Development Kit",
         "method": "jlink-flash",
