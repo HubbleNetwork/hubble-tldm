@@ -39,14 +39,6 @@
         "board_target": "nrf54l15dk/nrf54l15/cpuapp",
         "artifact": "nrf54l15dk.elf"
     },
-    "nrf54l15dk_sat": {
-        "name": "Nordic nRF54L15 Development Kit (Satellite)",
-        "method": "jlink-flash",
-        "jlink_device": "nRF54L15_M33",
-        "workspace": "sat-zephyr",
-        "board_target": "nrf54l15dk/nrf54l15/cpuapp",
-        "artifact": "nrf54l15dk_sat.elf"
-    },
     "bg22_ek4108a": {
         "name": "Silicon Labs EFR32BG22 Explorer Kit (BG22-EK4108A)",
         "method": "jlink-flash",

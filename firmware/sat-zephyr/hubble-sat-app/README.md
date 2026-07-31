@@ -2,8 +2,7 @@
 
 Continuously builds Hubble satellite packets and transmits them in a loop.
 This is the satellite counterpart to the BLE beacon in `firmware/zephyr`, and
-it produces the `nrf54l15dk_sat` and `nrf21540dk_sat` images published in
-`merge/`.
+it produces the `nrf21540dk_sat` image published in `merge/`.
 
 The master key is a placeholder at build time and is patched into the ELF by
 `hubbledemo flash` after the device is registered with the Hubble cloud, so
@@ -77,10 +76,8 @@ To build the application, run the following command:
 
 ```shell
 cd hubble-sat-app
-west build -b $BOARD app
+west build -b nrf21540dk/nrf52840 app
 ```
-
-where `$BOARD` is one of the targets in [Supported boards](#supported-boards).
 
 Once you have built the application, run the following command to flash it:
 
@@ -89,17 +86,31 @@ west flash
 ```
 
 A locally built image carries the placeholder key and will not produce
-decodable traffic. Use `hubbledemo flash nrf54l15dk_sat` to get an image
+decodable traffic. Use `hubbledemo flash nrf21540dk_sat` to get an image
 provisioned with a real device key.
 
 ## Supported boards
 
 | Board | Target | Notes |
 |-------|--------|-------|
-| Nordic nRF54L15 DK | `nrf54l15dk/nrf54l15/cpuapp` | Uses the nRF54 blob |
 | Nordic nRF21540 DK | `nrf21540dk/nrf52840` | Uses the nRF52 blob; the SDK drives the on-board FEM around each transmission |
 
-The SDK also supports satellite on `thingy53/nrf5340/cpunet`,
-`xg24_rb4187c`, and `xiao_mg24`. Adding one means adding an entry to
-`merge/md.json`; the CI matrix is generated from that file. The Silicon Labs
-targets additionally need `west blobs fetch hal_silabs` for the RAIL library.
+### A board must have a power amplifier
+
+Reaching a satellite needs far more link budget than terrestrial BLE. A board
+whose radio tops out around 0 dBm with no front-end module (FEM/PA) will build
+and transmit happily, but the signal will not be received. The failure mode is
+silent: the firmware reports success on every packet and nothing shows up in
+the satellite console.
+
+The nRF21540 DK qualifies because of its FEM, not because of its SoC. The
+nRF54L15 DK was evaluated and **deliberately excluded** for exactly this
+reason — it builds and runs, but at 0 dBm with no front-end it cannot close the
+link. Do not add it back.
+
+The SDK compiles satellite support for `thingy53/nrf5340/cpunet`,
+`xg24_rb4187c`, and `xiao_mg24` as well, but SDK support alone is not
+sufficient — confirm the board has a PA and check its output power before
+adding it. Adding one means adding an entry to `merge/md.json`; the CI matrix
+is generated from that file. The Silicon Labs targets additionally need
+`west blobs fetch hal_silabs` for the RAIL library.
