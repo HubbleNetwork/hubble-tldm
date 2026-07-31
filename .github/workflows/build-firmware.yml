@@ -33,6 +33,7 @@ jobs:
     outputs:
       zephyr_matrix: ${{ steps.matrix.outputs.zephyr_matrix }}
       ti_zephyr_matrix: ${{ steps.matrix.outputs.ti_zephyr_matrix }}
+      sat_zephyr_matrix: ${{ steps.matrix.outputs.sat_zephyr_matrix }}
     steps:
       - uses: actions/checkout@v4
 
@@ -49,11 +50,11 @@ jobs:
           fi
           unknown=$(jq -r '
             to_entries[]
-            | select((.value.workspace | IN("zephyr", "ti-zephyr")) | not)
+            | select((.value.workspace | IN("zephyr", "ti-zephyr", "sat-zephyr")) | not)
             | "\(.key)=\(.value.workspace)"
           ' merge/md.json)
           if [ -n "$unknown" ]; then
-            echo "::error::merge/md.json has entries with unknown workspace (expected zephyr or ti-zephyr): $unknown"
+            echo "::error::merge/md.json has entries with unknown workspace (expected zephyr, ti-zephyr or sat-zephyr): $unknown"
             exit 1
           fi
 
@@ -62,10 +63,13 @@ jobs:
         run: |
           zephyr=$(jq -c '[to_entries[] | select(.value.workspace == "zephyr") | {key, board_target: .value.board_target, artifact: .value.artifact}]' merge/md.json)
           ti=$(jq -c '[to_entries[] | select(.value.workspace == "ti-zephyr") | {key, board_target: .value.board_target, artifact: .value.artifact}]' merge/md.json)
+          sat=$(jq -c '[to_entries[] | select(.value.workspace == "sat-zephyr") | {key, board_target: .value.board_target, artifact: .value.artifact}]' merge/md.json)
           echo "zephyr_matrix=$zephyr" >> "$GITHUB_OUTPUT"
           echo "ti_zephyr_matrix=$ti" >> "$GITHUB_OUTPUT"
-          echo "Zephyr boards:    $zephyr"
-          echo "TI-Zephyr boards: $ti"
+          echo "sat_zephyr_matrix=$sat" >> "$GITHUB_OUTPUT"
+          echo "Zephyr boards:     $zephyr"
+          echo "TI-Zephyr boards:  $ti"
+          echo "Sat-Zephyr boards: $sat"
 
   build-zephyr:
     needs: setup-matrix
@@ -166,8 +170,57 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  build-sat-zephyr:
+    needs: setup-matrix
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        board: ${{ fromJSON(needs.setup-matrix.outputs.sat_zephyr_matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - uses: zephyrproject-rtos/action-zephyr-setup@v1
+        with:
+          app-path: hubble-sat-app
+          base-path: firmware/sat-zephyr
+          toolchains: arm-zephyr-eabi
+
+      # The satellite radio for Nordic SoCs ships as a prebuilt static library
+      # that west update does not pull in. Without this the link fails.
+      - name: Fetch satellite blobs
+        working-directory: firmware/sat-zephyr
+        run: west blobs fetch hubblenetwork-sdk
+
+      - name: Build firmware
+        working-directory: firmware/sat-zephyr
+        env:
+          BOARD_TARGET: ${{ matrix.board.board_target }}
+          ARTIFACT: ${{ matrix.board.artifact }}
+        run: |
+          west build -b "$BOARD_TARGET" -p always hubble-sat-app/app
+          cp build/zephyr/zephyr.elf "$GITHUB_WORKSPACE/$ARTIFACT"
+
+      - name: Verify ELF symbols
+        env:
+          ARTIFACT: ${{ matrix.board.artifact }}
+        run: python .github/scripts/verify-firmware-elf.py "$ARTIFACT"
+
+      - name: Upload ELF
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware-elfs-${{ matrix.board.key }}
+          path: ${{ matrix.board.artifact }}
+          if-no-files-found: error
+          retention-days: 14
+
   open-pr:
-    needs: [build-zephyr, build-ti-zephyr]
+    needs: [build-zephyr, build-ti-zephyr, build-sat-zephyr]
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.deploy }}
     runs-on: ubuntu-latest
     permissions:
