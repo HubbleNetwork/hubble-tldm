@@ -18,9 +18,15 @@
 LOG_MODULE_REGISTER(main, CONFIG_APP_LOG_LEVEL);
 
 /*
- * Payload is the device uptime in seconds, big-endian. hubble_sat_packet_get()
- * only accepts lengths of 0, 4, 9 or 13 bytes and rejects anything else with
- * -EINVAL, so this is the smallest non-empty payload the protocol allows.
+ * Payload is a 4 byte big-endian sequence number, incremented once per packet.
+ * hubble_sat_packet_get() only accepts lengths of 0, 4, 9 or 13 bytes and
+ * rejects anything else with -EINVAL, so this is the smallest non-empty
+ * payload the protocol allows.
+ *
+ * Gaps in the received sequence are the point: paired with RELIABILITY_NONE
+ * below, every packet is sent exactly once, so the numbers arriving at the
+ * console are a direct measure of delivery rate. The counter restarts at 0 on
+ * reboot.
  */
 #define PAYLOAD_LEN 4U
 
@@ -28,6 +34,7 @@ int main(void)
 {
 	struct hubble_sat_packet pkt;
 	uint8_t payload[PAYLOAD_LEN];
+	uint32_t seq = 0;
 	int err;
 
 	LOG_DBG("Hubble Network Satellite application started");
@@ -44,7 +51,7 @@ int main(void)
 	}
 
 	while (1) {
-		sys_put_be32((uint32_t)(k_uptime_get() / MSEC_PER_SEC), payload);
+		sys_put_be32(seq++, payload);
 
 		err = hubble_sat_packet_get(&pkt, payload, sizeof(payload));
 		if (err != 0) {
@@ -53,12 +60,21 @@ int main(void)
 		}
 
 		/*
-		 * NORMAL retransmits the packet 8 times at 20 second
-		 * intervals. A satellite pass is short and infrequent, so a
-		 * single unrepeated transmission is unlikely to be received.
-		 * This call blocks until the transmission period completes.
+		 * NONE transmits the packet exactly once. NORMAL and HIGH
+		 * would repeat the same packet 8 or 16 times, so one logical
+		 * packet would arrive as several identical copies and mask
+		 * how many were lost -- which is what we are measuring here.
+		 *
+		 * Expect most packets not to arrive: a lone transmission has
+		 * to coincide with a satellite pass, and NONE is excluded from
+		 * the SDK's clock-drift retry compensation. The gaps are the
+		 * signal, not a fault.
+		 *
+		 * NONE also makes this call return immediately rather than
+		 * blocking for a retry sequence, so the loop period really is
+		 * CONFIG_APP_SAT_TX_INTERVAL_SECONDS.
 		 */
-		err = hubble_sat_packet_send(&pkt, HUBBLE_SAT_RELIABILITY_NORMAL);
+		err = hubble_sat_packet_send(&pkt, HUBBLE_SAT_RELIABILITY_NONE);
 		if (err != 0) {
 			LOG_ERR("Failed to transmit packet");
 			return err;
