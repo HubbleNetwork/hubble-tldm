@@ -13,11 +13,6 @@ config APP_SAT_TX_INTERVAL_SECONDS
 	  Time the application sleeps between consecutive satellite packet
 	  transmissions, in seconds.
 
-	  Because packets are sent with HUBBLE_SAT_RELIABILITY_NONE, the send
-	  call does not block on a retry sequence, so this is also the
-	  effective packet rate. At the default of 10 a board transmits about
-	  8,600 packets a day; raise it to put less traffic on the network.
-
 menu "Zephyr"
 source "Kconfig.zephyr"
 endmenu

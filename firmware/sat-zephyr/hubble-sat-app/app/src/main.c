@@ -17,17 +17,7 @@
 
 LOG_MODULE_REGISTER(main, CONFIG_APP_LOG_LEVEL);
 
-/*
- * Payload is a 4 byte big-endian sequence number, incremented once per packet.
- * hubble_sat_packet_get() only accepts lengths of 0, 4, 9 or 13 bytes and
- * rejects anything else with -EINVAL, so this is the smallest non-empty
- * payload the protocol allows.
- *
- * Gaps in the received sequence are the point: paired with RELIABILITY_NONE
- * below, every packet is sent exactly once, so the numbers arriving at the
- * console are a direct measure of delivery rate. The counter restarts at 0 on
- * reboot.
- */
+/* hubble_sat_packet_get() only accepts lengths of 0, 4, 9 or 13 bytes. */
 #define PAYLOAD_LEN 4U
 
 int main(void)
@@ -60,19 +50,9 @@ int main(void)
 		}
 
 		/*
-		 * NONE transmits the packet exactly once. NORMAL and HIGH
-		 * would repeat the same packet 8 or 16 times, so one logical
-		 * packet would arrive as several identical copies and mask
-		 * how many were lost -- which is what we are measuring here.
-		 *
-		 * Expect most packets not to arrive: a lone transmission has
-		 * to coincide with a satellite pass, and NONE is excluded from
-		 * the SDK's clock-drift retry compensation. The gaps are the
-		 * signal, not a fault.
-		 *
-		 * NONE also makes this call return immediately rather than
-		 * blocking for a retry sequence, so the loop period really is
-		 * CONFIG_APP_SAT_TX_INTERVAL_SECONDS.
+		 * NONE sends the packet once, so gaps in the received
+		 * sequence numbers measure delivery rate. NORMAL and HIGH
+		 * repeat the same packet, which hides loss.
 		 */
 		err = hubble_sat_packet_send(&pkt, HUBBLE_SAT_RELIABILITY_NONE);
 		if (err != 0) {
