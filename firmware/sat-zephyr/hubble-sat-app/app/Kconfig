@@ -1,0 +1,22 @@
+# Copyright (c) 2026 HubbleNetwork
+# SPDX-License-Identifier: Apache-2.0
+#
+# This file is the application Kconfig entry point. All application Kconfig
+# options can be defined here or included via other application Kconfig files.
+# You can browse these options using the west targets menuconfig (terminal) or
+# guiconfig (GUI).
+
+config APP_SAT_TX_INTERVAL_SECONDS
+	int "Inter-transmission sleep in seconds"
+	default 10
+	help
+	  Time the application sleeps between consecutive satellite packet
+	  transmissions, in seconds.
+
+menu "Zephyr"
+source "Kconfig.zephyr"
+endmenu
+
+module = APP
+module-str = APP
+source "subsys/logging/Kconfig.template.log_config"
