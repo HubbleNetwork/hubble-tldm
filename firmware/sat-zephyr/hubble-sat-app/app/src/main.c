@@ -17,14 +17,17 @@
 
 LOG_MODULE_REGISTER(main, CONFIG_APP_LOG_LEVEL);
 
-/* hubble_sat_packet_get() only accepts lengths of 0, 4, 9 or 13 bytes. */
+/*
+ * Payload is the device uptime in seconds, big-endian. hubble_sat_packet_get()
+ * only accepts lengths of 0, 4, 9 or 13 bytes and rejects anything else with
+ * -EINVAL, so this is the smallest non-empty payload the protocol allows.
+ */
 #define PAYLOAD_LEN 4U
 
 int main(void)
 {
 	struct hubble_sat_packet pkt;
 	uint8_t payload[PAYLOAD_LEN];
-	uint32_t seq = 0;
 	int err;
 
 	LOG_DBG("Hubble Network Satellite application started");
@@ -41,7 +44,7 @@ int main(void)
 	}
 
 	while (1) {
-		sys_put_be32(seq++, payload);
+		sys_put_be32((uint32_t)(k_uptime_get() / MSEC_PER_SEC), payload);
 
 		err = hubble_sat_packet_get(&pkt, payload, sizeof(payload));
 		if (err != 0) {
@@ -49,11 +52,7 @@ int main(void)
 			return err;
 		}
 
-		/*
-		 * NONE sends the packet once, so gaps in the received
-		 * sequence numbers measure delivery rate. NORMAL and HIGH
-		 * repeat the same packet, which hides loss.
-		 */
+		/* NONE sends the packet once, with no retries. */
 		err = hubble_sat_packet_send(&pkt, HUBBLE_SAT_RELIABILITY_NONE);
 		if (err != 0) {
 			LOG_ERR("Failed to transmit packet");
