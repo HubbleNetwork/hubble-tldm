@@ -52,13 +52,8 @@ int main(void)
 			return err;
 		}
 
-		/*
-		 * NORMAL retransmits the packet 8 times at 20 second
-		 * intervals. A satellite pass is short and infrequent, so a
-		 * single unrepeated transmission is unlikely to be received.
-		 * This call blocks until the transmission period completes.
-		 */
-		err = hubble_sat_packet_send(&pkt, HUBBLE_SAT_RELIABILITY_NORMAL);
+		/* NONE sends the packet once, with no retries. */
+		err = hubble_sat_packet_send(&pkt, HUBBLE_SAT_RELIABILITY_NONE);
 		if (err != 0) {
 			LOG_ERR("Failed to transmit packet");
 			return err;
