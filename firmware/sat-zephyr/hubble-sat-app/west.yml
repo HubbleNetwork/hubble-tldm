@@ -20,10 +20,12 @@ manifest:
       west-commands: scripts/west-commands.yml
     - name: hubblenetwork-sdk
       repo-path: sdk
-      # Pinned to a commit rather than a tag: satellite board support
-      # (port/zephyr/boards) and the satellite radio blobs landed after
-      # v2.0.0 and no release tag contains them yet. Move this to v2.1.0
-      # once the SDK cuts one.
-      revision: a71a6bc8c1bc939ded10dc7a7965c8b412d93680
+      # Pinned to a commit rather than a tag. The newest tag (v3.0.0-rc1)
+      # predates 370f513 "sat: packet: Fix symbol clobbered by ECC lookup",
+      # without which every transmitted packet has its last 6 data symbols
+      # overwritten by Reed-Solomon parity and cannot be decoded or
+      # decrypted by the ground station. Do not move this back to a tag
+      # until one contains that fix.
+      revision: 323ffa50936992bcd7177d99a1c863f38d3a4e44
       path: modules/lib/hubblenetwork-sdk
       remote: hubble
