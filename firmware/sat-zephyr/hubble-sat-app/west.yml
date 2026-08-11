@@ -20,12 +20,11 @@ manifest:
       west-commands: scripts/west-commands.yml
     - name: hubblenetwork-sdk
       repo-path: sdk
-      # Pinned to a commit rather than a tag. The newest tag (v3.0.0-rc1)
-      # predates 370f513 "sat: packet: Fix symbol clobbered by ECC lookup",
-      # without which every transmitted packet has its last 6 data symbols
-      # overwritten by Reed-Solomon parity and cannot be decoded or
-      # decrypted by the ground station. Do not move this back to a tag
-      # until one contains that fix.
-      revision: 323ffa50936992bcd7177d99a1c863f38d3a4e44
+      # v3.0.0 is the first tag containing 370f513 "sat: packet: Fix symbol
+      # clobbered by ECC lookup", without which every transmitted packet has
+      # its last 6 data symbols overwritten by Reed-Solomon parity and cannot
+      # be decoded or decrypted by the ground station. Do not move this pin
+      # below v3.0.0.
+      revision: v3.0.0
       path: modules/lib/hubblenetwork-sdk
       remote: hubble
