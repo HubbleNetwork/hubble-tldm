@@ -191,11 +191,14 @@ jobs:
           base-path: firmware/sat-zephyr
           toolchains: arm-zephyr-eabi
 
-      # The satellite radio for Nordic SoCs ships as a prebuilt static library
-      # that west update does not pull in. Without this the link fails.
+      # Nordic SoCs link a prebuilt Hubble satellite radio library. Silicon Labs
+      # SoCs instead compile the radio from source against RAIL, which ships in
+      # hal_silabs. west update pulls in neither, and the link fails without them.
       - name: Fetch satellite blobs
         working-directory: firmware/sat-zephyr
-        run: west blobs fetch hubblenetwork-sdk
+        run: |
+          west blobs fetch hubblenetwork-sdk
+          west blobs fetch hal_silabs
 
       - name: Build firmware
         working-directory: firmware/sat-zephyr

@@ -2,7 +2,8 @@
 
 Continuously builds Hubble satellite packets and transmits them in a loop.
 This is the satellite counterpart to the BLE beacon in `firmware/zephyr`, and
-it produces the `nrf21540dk_sat` image published in `merge/`.
+it produces the `nrf21540dk_sat` and `xg24_rb4187c_sat` images published in
+`merge/`.
 
 The master key is a placeholder at build time and is patched into the ELF by
 `hubbledemo flash` after the device is registered with the Hubble cloud, so
@@ -59,16 +60,19 @@ west sdk install
 ### Satellite radio blobs
 
 The satellite radio implementation for Nordic SoCs ships as a prebuilt static
-library rather than source. These are **not** fetched by `west update`; pull
-them in explicitly once after setting up the workspace:
+library rather than source. Silicon Labs SoCs are the other way around: the
+radio is compiled from source, but against Silicon Labs' RAIL library, which is
+itself a blob in `hal_silabs`. Neither is fetched by `west update`; pull them in
+explicitly once after setting up the workspace:
 
 ```shell
 west blobs fetch hubblenetwork-sdk
+west blobs fetch hal_silabs
 ```
 
-Without this the build fails to link the satellite radio. Run
-`west blobs list hubblenetwork-sdk` to see what is available and whether it has
-been fetched.
+Without these the build fails to link the satellite radio. Run
+`west blobs list <module>` to see what is available and whether it has been
+fetched.
 
 ### Building and running
 
@@ -94,6 +98,7 @@ provisioned with a real device key.
 | Board | Target | Notes |
 |-------|--------|-------|
 | Nordic nRF21540 DK | `nrf21540dk/nrf52840` | Uses the nRF52 blob; the SDK drives the on-board FEM around each transmission |
+| Silicon Labs xG24-RB4187C | `xg24_rb4187c` | 19.5 dBm PA part (`EFR32MG24B220`); radio board, needs a WSTK/Pro Kit mainboard to run |
 
 ### A board must have a power amplifier
 
@@ -108,9 +113,17 @@ nRF54L15 DK was evaluated and **deliberately excluded** for exactly this
 reason — it builds and runs, but at 0 dBm with no front-end it cannot close the
 link. Do not add it back.
 
-The SDK compiles satellite support for `thingy53/nrf5340/cpunet`,
-`xg24_rb4187c`, and `xiao_mg24` as well, but SDK support alone is not
-sufficient — confirm the board has a PA and check its output power before
-adding it. Adding one means adding an entry to `merge/md.json`; the CI matrix
-is generated from that file. The Silicon Labs targets additionally need
-`west blobs fetch hal_silabs` for the RAIL library.
+Silicon Labs xG24 parts have the same trap in a subtler form. They come in
+10 dBm and 19.5 dBm variants, and the part number encodes which: the digit
+before the flash size is `1` for 10 dBm and `2` for 19.5 dBm. The SDK asks the
+radio for 20 dBm and RAIL quietly clamps that to whatever the part supports, so
+a 10 dBm part gives up 10 dB with nothing in the log to show for it. Only
+`xg24_rb4187c` (`EFR32MG24B220`) is a 19.5 dBm board. The xG24 Explorer Kit
+(`xg24_ek2703a`, `EFR32MG24B210`) and Dev Kit (`xg24_dk2601b`,
+`EFR32MG24B310`) are 10 dBm parts — both build cleanly, and neither should be
+used for satellite.
+
+The SDK compiles satellite support for `thingy53/nrf5340/cpunet` and
+`xiao_mg24` as well, but SDK support alone is not sufficient — confirm the
+board has a PA and check its output power before adding it. Adding one means
+adding an entry to `merge/md.json`; the CI matrix is generated from that file.
