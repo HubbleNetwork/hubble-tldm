@@ -39,6 +39,14 @@
         "board_target": "nrf54l15dk/nrf54l15/cpuapp",
         "artifact": "nrf54l15dk.elf"
     },
+    "xg24_rb4187c_sat": {
+        "name": "Silicon Labs EFR32xG24 20 dBm Radio Board (xG24-RB4187C, Satellite)",
+        "method": "jlink-flash",
+        "jlink_device": "EFR32MG24BxxxF1536",
+        "workspace": "sat-zephyr",
+        "board_target": "xg24_rb4187c",
+        "artifact": "xg24_rb4187c_sat.elf"
+    },
     "bg22_ek4108a": {
         "name": "Silicon Labs EFR32BG22 Explorer Kit (BG22-EK4108A)",
         "method": "jlink-flash",
