@@ -7,6 +7,20 @@ import petname
 import hubbledemo
 from hubblenetwork import DEVICE_UPTIME, Device, Organization
 
+# Satellite continuous images in merge/md.json use a `_sat` board-id suffix.
+# Devices registered while flashing those boards get this tag so Dash FTUE
+# can surface next-pass UX (HUB-6087).
+_SATELLITE_BOARD_SUFFIX = "_sat"
+_SATELLITE_DEVICE_TAGS = {"satellite": "next-pass"}
+
+
+def registration_tags_for_board(board: str) -> dict[str, str] | None:
+    """Return register-time tags for a board id, or None for terrestrial boards."""
+    if board.endswith(_SATELLITE_BOARD_SUFFIX):
+        return dict(_SATELLITE_DEVICE_TAGS)
+    return None
+
+
 def _get_env_or_fail(name: str) -> str:
     val = os.getenv(name)
     if not val:
@@ -112,13 +126,28 @@ def flash(board: str, name: str = None, file: str = None, org_id: str = None, to
         click.secho(f"\tEnvironment: {org.env.name}")
 
         click.secho('[INFO] Registering new device"... ', nl=False)
-        device = org.register_device(
-            encryption=metadata[board]["encryption"] if "encryption" in metadata[board] else None,
-            counter_source=DEVICE_UPTIME,
-        )
+        register_tags = registration_tags_for_board(board)
+        register_kwargs = {
+            "encryption": metadata[board]["encryption"] if "encryption" in metadata[board] else None,
+            "counter_source": DEVICE_UPTIME,
+        }
+        if register_tags is not None:
+            register_kwargs["tags"] = register_tags
+        try:
+            device = org.register_device(**register_kwargs)
+        except TypeError as exc:
+            if register_tags is not None:
+                raise click.ClickException(
+                    "Satellite board registration requires pyhubblenetwork with "
+                    "register_device(tags=...) support (0.14.0+). "
+                    "Upgrade pyhubblenetwork, then retry."
+                ) from exc
+            raise
         click.secho("[SUCCESS]")
         click.secho(f"\tDevice ID:  {device.id}")
         click.secho(f"\tDevice Key: {base64.b64encode(device.key).decode('ascii')}")
+        if register_tags:
+            click.secho(f"\tTags:       {register_tags}")
 
         # Generate device name if not provided
         if not name:
