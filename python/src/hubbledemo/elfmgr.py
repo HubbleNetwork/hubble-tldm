@@ -32,7 +32,8 @@ def _find_symbol(elf: ELFFile, name: str):
                 target_sec = elf.get_section(shndx)
                 if target_sec is None:
                     raise ValueError(f"Could not find section for symbol '{name}'.")
-                if target_sec.name == "bss":
+                # SHT_NOBITS sections aren't patchable since they are empty.
+                if target_sec["sh_type"] == "SHT_NOBITS":
                     continue
                 return sym, target_sec
     return None, None
