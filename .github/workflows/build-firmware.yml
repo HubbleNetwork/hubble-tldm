@@ -27,13 +27,14 @@ env:
   # 0.17.x breaks the TI fork's libc-hooks.c (CLAUDE.md gotcha) — keep at 0.16.9.
   ZEPHYR_SDK_VERSION_TI: "0.16.9"
 
+  # Add new build workspaces here. Each workspace needs a build job below.
+  WORKSPACES: '["zephyr","ti-zephyr","sat-zephyr"]'
+
 jobs:
   setup-matrix:
     runs-on: ubuntu-latest
     outputs:
-      zephyr_matrix: ${{ steps.matrix.outputs.zephyr_matrix }}
-      ti_zephyr_matrix: ${{ steps.matrix.outputs.ti_zephyr_matrix }}
-      sat_zephyr_matrix: ${{ steps.matrix.outputs.sat_zephyr_matrix }}
+      matrix: ${{ steps.matrix.outputs.matrix }}
     steps:
       - uses: actions/checkout@v4
 
@@ -48,28 +49,26 @@ jobs:
             echo "::error::merge/md.json entries missing workspace/board_target/artifact: $missing"
             exit 1
           fi
-          unknown=$(jq -r '
+          unknown=$(jq -r --argjson workspaces "$WORKSPACES" '
             to_entries[]
-            | select((.value.workspace | IN("zephyr", "ti-zephyr", "sat-zephyr")) | not)
+            | select((.value.workspace | IN($workspaces[])) | not)
             | "\(.key)=\(.value.workspace)"
           ' merge/md.json)
           if [ -n "$unknown" ]; then
-            echo "::error::merge/md.json has entries with unknown workspace (expected zephyr, ti-zephyr or sat-zephyr): $unknown"
+            echo "::error::merge/md.json has entries with unknown workspace (expected one of $WORKSPACES): $unknown"
             exit 1
           fi
 
       - name: Build matrices from md.json
         id: matrix
         run: |
-          zephyr=$(jq -c '[to_entries[] | select(.value.workspace == "zephyr") | {key, board_target: .value.board_target, artifact: .value.artifact}]' merge/md.json)
-          ti=$(jq -c '[to_entries[] | select(.value.workspace == "ti-zephyr") | {key, board_target: .value.board_target, artifact: .value.artifact}]' merge/md.json)
-          sat=$(jq -c '[to_entries[] | select(.value.workspace == "sat-zephyr") | {key, board_target: .value.board_target, artifact: .value.artifact}]' merge/md.json)
-          echo "zephyr_matrix=$zephyr" >> "$GITHUB_OUTPUT"
-          echo "ti_zephyr_matrix=$ti" >> "$GITHUB_OUTPUT"
-          echo "sat_zephyr_matrix=$sat" >> "$GITHUB_OUTPUT"
-          echo "Zephyr boards:     $zephyr"
-          echo "TI-Zephyr boards:  $ti"
-          echo "Sat-Zephyr boards: $sat"
+          matrix=$(jq -c --argjson workspaces "$WORKSPACES" '
+            [$workspaces[] as $w | {
+              ($w): [to_entries[] | select(.value.workspace == $w) | {key, board_target: .value.board_target, artifact: .value.artifact}]
+            }] | add
+          ' merge/md.json)
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+          echo "$matrix" | jq .
 
   build-zephyr:
     needs: setup-matrix
@@ -77,7 +76,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        board: ${{ fromJSON(needs.setup-matrix.outputs.zephyr_matrix) }}
+        board: ${{ fromJSON(needs.setup-matrix.outputs.matrix)['zephyr'] }}
     steps:
       - uses: actions/checkout@v4
 
@@ -127,7 +126,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        board: ${{ fromJSON(needs.setup-matrix.outputs.ti_zephyr_matrix) }}
+        board: ${{ fromJSON(needs.setup-matrix.outputs.matrix)['ti-zephyr'] }}
     steps:
       - uses: actions/checkout@v4
 
@@ -176,7 +175,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        board: ${{ fromJSON(needs.setup-matrix.outputs.sat_zephyr_matrix) }}
+        board: ${{ fromJSON(needs.setup-matrix.outputs.matrix)['sat-zephyr'] }}
     steps:
       - uses: actions/checkout@v4
 
