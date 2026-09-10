@@ -28,7 +28,7 @@ env:
   ZEPHYR_SDK_VERSION_TI: "0.16.9"
 
   # Add new build workspaces here. Each workspace needs a build job below.
-  WORKSPACES: '["zephyr","ti-zephyr","sat-zephyr"]'
+  WORKSPACES: '["zephyr","ti-zephyr","sat-zephyr","sat-freertos-ti"]'
 
 jobs:
   setup-matrix:
@@ -221,8 +221,58 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  build-sat-freertos-ti:
+    needs: setup-matrix
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    container:
+      image: ghcr.io/hubblenetwork/ti-ci-docker:9.20.00.81
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    strategy:
+      fail-fast: false
+      matrix:
+        board: ${{ fromJSON(needs.setup-matrix.outputs.matrix)['sat-freertos-ti'] }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check out the Hubble Device SDK
+        working-directory: firmware/sat-freertos-ti
+        run: |
+          SDK_REV="$(cat sdk-revision)"
+          echo "Pinned SDK revision: $SDK_REV"
+          git clone --depth 1 --branch "$SDK_REV" https://github.com/HubbleNetwork/hubble-device-sdk.git hubble-device-sdk
+
+      - name: Build firmware
+        working-directory: firmware/sat-freertos-ti/hubble-sat-app
+        env:
+          BOARD_TARGET: ${{ matrix.board.board_target }}
+          ARTIFACT: ${{ matrix.board.artifact }}
+        run: |
+          make -f "${BOARD_TARGET}.mk"
+          cp build/hubble-sat-app.out "$GITHUB_WORKSPACE/$ARTIFACT"
+
+      # action-zephyr-setup installs pyelftools, but FreeRTOS-TI still needs to install it
+      - name: Verify ELF symbols
+        env:
+          ARTIFACT: ${{ matrix.board.artifact }}
+        run: |
+          pip install pyelftools
+          python3 .github/scripts/verify-firmware-elf.py "$ARTIFACT"
+
+      - name: Upload ELF
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware-elfs-${{ matrix.board.key }}
+          path: ${{ matrix.board.artifact }}
+          if-no-files-found: error
+          retention-days: 14
+
   open-pr:
-    needs: [build-zephyr, build-ti-zephyr, build-sat-zephyr]
+    needs: [build-zephyr, build-ti-zephyr, build-sat-zephyr, build-sat-freertos-ti]
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.deploy }}
     runs-on: ubuntu-latest
     permissions:

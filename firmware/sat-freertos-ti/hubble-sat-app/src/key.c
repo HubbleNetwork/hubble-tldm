@@ -1,0 +1,2 @@
+__attribute__((used,
+	       retain)) static const uint8_t master_key[CONFIG_HUBBLE_KEY_SIZE] = {1};
