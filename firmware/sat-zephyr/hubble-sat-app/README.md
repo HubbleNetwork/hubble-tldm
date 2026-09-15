@@ -15,10 +15,6 @@ big-endian. The payload is encrypted along with the rest of the packet.
 and rejects anything else with `-EINVAL`, and a longer payload means a larger
 PDU and more airtime per transmission.
 
-> [!NOTE]
-> Satellite functionality is pre-production and not yet ready for production
-> deployments.
-
 ## Getting Started
 
 Before getting started, make sure you have a proper Zephyr development
