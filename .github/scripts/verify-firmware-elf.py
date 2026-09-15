@@ -29,10 +29,11 @@ def find_symbol(elf: ELFFile, name: str):
             target = elf.get_section(shndx)
             if target is None:
                 raise SystemExit(f"{name}: section index {shndx} not resolvable")
-            if target.name == "bss":
+            # SHT_NOBITS sections aren't patchable since they are empty.
+            if target["sh_type"] == "SHT_NOBITS":
                 continue
             return sym, target
-    raise SystemExit(f"{name}: not found in .symtab or .dynsym")
+    raise SystemExit(f"{name}: no patchable definition found (not in .symtab/.dynsym, or only in .bss)")
 
 
 def main(path: str) -> None:
