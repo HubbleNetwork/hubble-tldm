@@ -228,7 +228,7 @@ jobs:
       contents: read
       packages: read
     container:
-      image: ghcr.io/hubblenetwork/ti-ci-docker:9.20.00.81
+      image: ghcr.io/hubblenetwork/vendor-ci-docker:ti-freertos-9.20.00.81
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
