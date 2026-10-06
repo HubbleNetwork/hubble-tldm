@@ -111,6 +111,16 @@ def flash(board: str, name: str = None, file: str = None, org_id: str = None, to
         )
         return 2
 
+    if metadata[board]["method"] == "esptool-flash":
+        chip = metadata[board]["esptool_chip"]
+        click.secho(f"[INFO] Looking for {chip} board...")
+        try:
+            port = hubbledemo.find_esp_device(chip=chip)
+        except RuntimeError as e:
+            click.secho(f"[ERROR] {e}", fg="red", err=True)
+            return 2
+        click.secho(f"[SUCCESS] Found {chip} on {port}")
+
     device_key = os.getenv("HUBBLE_DEVICE_KEY")
     device_name = name if name else petname.generate(words=3)
 
@@ -146,6 +156,26 @@ def flash(board: str, name: str = None, file: str = None, org_id: str = None, to
         click.secho("[INFO] Setting device name... ", nl=False)
         org.set_device_name(device_id=device.id, name=device_name)
         click.secho("[SUCCESS]")
+
+    # ESP boards flash a merged image; the ELF only locates the key in it.
+    if metadata[board]["method"] == "esptool-flash":
+        click.secho(f"[INFO] Retrieving binary and image for {board}... ", nl=False)
+        elf = hubbledemo.fetch_artifact(board=board, ext="elf")
+        image = hubbledemo.fetch_artifact(board=board, ext="bin").getvalue()
+        click.secho("[SUCCESS]")
+
+        click.secho("[INFO] Patching key into image... ", nl=False)
+        key_addr, expected = hubbledemo.locate_esp_key(elf)
+        image = hubbledemo.patch_esp_image(image, key_addr, expected, device.key)
+        click.secho("[SUCCESS]")
+
+        # esptool reports its own progress, so this line is not left open.
+        click.secho(f"[INFO] Flashing image onto device on {port}...")
+        hubbledemo.flash_esp_image(image, port=port)
+        click.secho("[SUCCESS]")
+
+        click.secho(f"\n{board} successfully flashed and provisioned!")
+        return 0
 
     click.secho(f"[INFO] Retrieving binary for {board}... ", nl=False)
     buf = hubbledemo.fetch_artifact(board=board, ext="elf")

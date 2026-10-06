@@ -19,11 +19,13 @@ classifiers = [
 ]
 dependencies = [
   "click",
+  "esptool>=5.0.2,<6",
   "petname",
   "pylink-square",
   "pyelftools",
   "intelhex",
   "pyhubblenetwork>=0.14.0",
+  "pyserial",
   "requests",
 ]
 
