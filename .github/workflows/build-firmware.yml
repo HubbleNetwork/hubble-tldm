@@ -28,7 +28,7 @@ env:
   ZEPHYR_SDK_VERSION_TI: "0.16.9"
 
   # Add new build workspaces here. Each workspace needs a build job below.
-  WORKSPACES: '["zephyr","ti-zephyr","sat-zephyr","sat-freertos-ti"]'
+  WORKSPACES: '["zephyr","ti-zephyr","sat-zephyr","sat-freertos-ti","sat-esp-idf"]'
 
 jobs:
   setup-matrix:
@@ -271,8 +271,70 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  build-sat-esp-idf:
+    needs: setup-matrix
+    runs-on: ubuntu-latest
+    container:
+      image: espressif/idf:v6.1
+    strategy:
+      fail-fast: false
+      matrix:
+        board: ${{ fromJSON(needs.setup-matrix.outputs.matrix)['sat-esp-idf'] }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+
+      # The image's entrypoint sources export.sh, but Actions bypasses the
+      # entrypoint in container jobs, so each step sources it itself.
+      #
+      # ESP chips boot through a second-stage bootloader and a partition table,
+      # so the ELF alone is not flashable. Besides the app ELF, which hubbledemo
+      # uses to locate master_key, this publishes <artifact>.bin: bootloader,
+      # partition table and app merged into one image written at offset 0x0.
+      # Both come from the same build; hubbledemo checks that they agree.
+      - name: Build firmware
+        id: build
+        working-directory: firmware/sat-esp-idf/hubble-sat-app
+        env:
+          BOARD_TARGET: ${{ matrix.board.board_target }}
+          ARTIFACT: ${{ matrix.board.artifact }}
+        run: |
+          . "$IDF_PATH/export.sh"
+          idf.py set-target "$BOARD_TARGET"
+          idf.py build
+          # Not sat-continuous.bin: that is the app image merge-bin reads, and
+          # it would be truncated before being read.
+          idf.py merge-bin -o merged.bin
+          # merge/*.elf is committed on every rebuild; an ESP ELF is ~8 MB of
+          # which ~80% is DWARF. --strip-debug keeps .symtab, so master_key
+          # stays locatable. CMake records the strip tool for this target.
+          STRIP="$(sed -n 's/^CMAKE_STRIP:FILEPATH=//p' build/CMakeCache.txt)"
+          "$STRIP" --strip-debug -o "$GITHUB_WORKSPACE/$ARTIFACT" build/sat-continuous.elf
+          cp build/merged.bin "$GITHUB_WORKSPACE/${ARTIFACT%.elf}.bin"
+          echo "bin=${ARTIFACT%.elf}.bin" >> "$GITHUB_OUTPUT"
+
+      - name: Verify ELF symbols
+        env:
+          ARTIFACT: ${{ matrix.board.artifact }}
+        run: |
+          . "$IDF_PATH/export.sh"
+          python -m pip install pyelftools
+          python .github/scripts/verify-firmware-elf.py "$ARTIFACT"
+
+      - name: Upload ELF and image
+        uses: actions/upload-artifact@v7
+        with:
+          name: firmware-elfs-${{ matrix.board.key }}
+          path: |
+            ${{ matrix.board.artifact }}
+            ${{ steps.build.outputs.bin }}
+          if-no-files-found: error
+          retention-days: 14
+
   open-pr:
-    needs: [build-zephyr, build-ti-zephyr, build-sat-zephyr, build-sat-freertos-ti]
+    needs: [build-zephyr, build-ti-zephyr, build-sat-zephyr, build-sat-freertos-ti, build-sat-esp-idf]
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.deploy }}
     runs-on: ubuntu-latest
     permissions:
@@ -308,7 +370,7 @@ jobs:
             jq -r 'to_entries[] | "- `\(.key)` (\(.value.workspace)) → `\(.value.artifact)`"' merge/md.json
             echo
             echo "**Reviewer checklist** — merging publishes new firmware to every \`pyhubbledemo\` user:"
-            echo "- [ ] Diff contains only \`merge/*.elf\` changes"
+            echo "- [ ] Diff contains only \`merge/*.elf\` and \`merge/*.bin\` changes"
             echo "- [ ] Spot-check at least one ELF locally with \`hubbledemo flash\` against real hardware"
             echo "- [ ] Confirm SDK versions in workflow match the intended release toolchain"
             echo "PR_EOF"
@@ -320,6 +382,8 @@ jobs:
           branch: automated/firmware-build-${{ github.run_id }}
           title: "chore(merge): rebuild firmware ELFs"
           body: ${{ steps.body.outputs.body }}
-          add-paths: merge/*.elf
+          add-paths: |
+            merge/*.elf
+            merge/*.bin
           commit-message: "chore(merge): rebuild firmware ELFs from workflow ${{ github.run_id }}"
           delete-branch: true

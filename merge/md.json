@@ -86,5 +86,13 @@
         "workspace": "sat-freertos-ti",
         "board_target": "lp_em_cc2755p10",
         "artifact": "lp_em_cc2755p10_sat.elf"
+    },
+    "esp32c6_sat": {
+        "name": "Espressif ESP32-C6 Development Kit (Satellite)",
+        "method": "esptool-flash",
+        "esptool_chip": "esp32c6",
+        "workspace": "sat-esp-idf",
+        "board_target": "esp32c6",
+        "artifact": "esp32c6_sat.elf"
     }
 }
