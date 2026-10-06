@@ -133,16 +133,7 @@ def flash(board: str, name: str = None, file: str = None, org_id: str = None, to
         }
         if register_tags is not None:
             register_kwargs["tags"] = register_tags
-        try:
-            device = org.register_device(**register_kwargs)
-        except TypeError as exc:
-            if register_tags is not None:
-                raise click.ClickException(
-                    "Satellite board registration requires pyhubblenetwork with "
-                    "register_device(tags=...) support (0.14.0+). "
-                    "Upgrade pyhubblenetwork, then retry."
-                ) from exc
-            raise
+        device = org.register_device(**register_kwargs)
         click.secho("[SUCCESS]")
         click.secho(f"\tDevice ID:  {device.id}")
         click.secho(f"\tDevice Key: {base64.b64encode(device.key).decode('ascii')}")
