@@ -12,7 +12,7 @@ _ARTIFACT_BASE_URL = (
 
 _METADATA_FILENAME = "md.json"
 
-def fetch_elf(board: str, timeout: float = 20.0) -> io.BytesIO:
+def fetch_elf(board: str, timeout: float = 5.0) -> io.BytesIO:
     """
     Download the board-specific ELF from HubbleNetwork/hubble-tldm/merge and
     return it as an io.BytesIO.
@@ -61,7 +61,7 @@ def fetch_elf(board: str, timeout: float = 20.0) -> io.BytesIO:
     last_err: Optional[Exception] = None
     for attempt in range(1, max(1, retries) + 1):
         try:
-            resp = requests.get(url, timeout=5)
+            resp = requests.get(url, timeout=timeout)
 
             if resp.status_code == 404:
                 # Not found is definitive; don't bother retrying
