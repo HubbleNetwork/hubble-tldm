@@ -12,39 +12,45 @@ _ARTIFACT_BASE_URL = (
 
 _METADATA_FILENAME = "md.json"
 
-def fetch_elf(board: str, timeout: float = 5.0) -> io.BytesIO:
+def fetch_artifact(board: str, ext: str, timeout: float = 5.0) -> io.BytesIO:
     """
-    Download the board-specific ELF from HubbleNetwork/hubble-tldm/merge and
+    Download a board-specific artifact from HubbleNetwork/hubble-tldm/merge and
     return it as an io.BytesIO.
 
     Parameters
     ----------
-    board_name : str
+    board : str
         Board identifier (e.g. 'nrf21540dk', 'xg24_ek2703a', 'xg22_ek4108a').
+    ext : str
+        Artifact extension (e.g. 'elf', 'bin').
     timeout : float
         Requests timeout in seconds (connect + read).
 
     Returns
     -------
     io.BytesIO
-        Raw bytes of the .elf file
+        Raw bytes of the artifact
 
     Raises
     ------
     ValueError
         If the board is not supported or name is malformed.
     FileNotFoundError
-        If the expected ELF file does not exist in the merge directory.
+        If the expected artifact does not exist in the merge directory.
     ConnectionError
         On network, HTTP, or parsing failures.
     """
     if not isinstance(board, str) or not board.strip():
         raise ValueError("board must be a non-empty string")
 
-    # If we have a local override, just use that
+    # If we have a local override, just use that. It names the ELF; other
+    # artifacts sit next to it with the same stem, as they do in merge/.
     local_file = os.getenv("HUBBLE_DEMO_ELF_FILE")
     if local_file:
-        return io.BytesIO(Path(local_file).read_bytes())
+        path = Path(local_file)
+        if ext != "elf":
+            path = path.with_suffix(f".{ext}")
+        return io.BytesIO(path.read_bytes())
 
     # Give option (for development) to pull binary from elsewhere
     val = os.getenv("HUBBLE_DEMO_URL_OVERRIDE")
@@ -53,7 +59,8 @@ def fetch_elf(board: str, timeout: float = 5.0) -> io.BytesIO:
     else:
         base_url = _ARTIFACT_BASE_URL
 
-    url = f"{base_url}/{board}.elf"
+    url = f"{base_url}/{board}.{ext}"
+    kind = ext.upper()
 
     _RETRY_STATUS = {429, 500, 502, 503, 504}
     retries = 5
@@ -65,7 +72,7 @@ def fetch_elf(board: str, timeout: float = 5.0) -> io.BytesIO:
 
             if resp.status_code == 404:
                 # Not found is definitive; don't bother retrying
-                raise FileNotFoundError(f"No ELF for board '{board}' at {url}")
+                raise FileNotFoundError(f"No {kind} for board '{board}' at {url}")
 
             # Retry transient status codes (unless it's the final attempt)
             if resp.status_code in _RETRY_STATUS and attempt < retries:
@@ -79,7 +86,7 @@ def fetch_elf(board: str, timeout: float = 5.0) -> io.BytesIO:
             # Basic sanity checks: content-type and size
             ctype = (resp.headers.get("Content-Type") or "").lower()
             if "html" in ctype:
-                raise ValueError(f"Expected ELF bytes, got {ctype} from {url}")
+                raise ValueError(f"Expected {kind} bytes, got {ctype} from {url}")
 
             return io.BytesIO(resp.content)
 
@@ -89,13 +96,13 @@ def fetch_elf(board: str, timeout: float = 5.0) -> io.BytesIO:
                 sleep_s = (2 ** (attempt - 1))
                 time.sleep(sleep_s)
                 continue
-            raise ConnectionError(f"Failed to download ELF from {url}: {e}") from e
+            raise ConnectionError(f"Failed to download {kind} from {url}: {e}") from e
 
         except Exception:
             raise
 
     # Should not reach here; defensive:
-    raise ConnectionError(f"Failed to download ELF from {url}: {last_err}")
+    raise ConnectionError(f"Failed to download {kind} from {url}: {last_err}")
 
 def fetch_metadata() -> Any:
     """

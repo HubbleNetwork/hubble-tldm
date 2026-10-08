@@ -148,7 +148,7 @@ def flash(board: str, name: str = None, file: str = None, org_id: str = None, to
         click.secho("[SUCCESS]")
 
     click.secho(f"[INFO] Retrieving binary for {board}... ", nl=False)
-    buf = hubbledemo.fetch_elf(board=board)
+    buf = hubbledemo.fetch_artifact(board=board, ext="elf")
     click.secho("[SUCCESS]")
 
     click.secho("[INFO] Patching key into binary... ", nl=False)
