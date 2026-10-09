@@ -3,7 +3,7 @@ def test_package_imports():
 
     assert hubbledemo.flash_elf
     assert hubbledemo.patch_elf
-    assert hubbledemo.fetch_elf
+    assert hubbledemo.fetch_artifact
     assert hubbledemo.fetch_metadata
 
 
