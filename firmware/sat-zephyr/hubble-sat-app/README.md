@@ -119,7 +119,10 @@ a 10 dBm part gives up 10 dB with nothing in the log to show for it. Only
 `EFR32MG24B310`) are 10 dBm parts — both build cleanly, and neither should be
 used for satellite.
 
-The SDK compiles satellite support for `thingy53/nrf5340/cpunet` and
-`xiao_mg24` as well, but SDK support alone is not sufficient — confirm the
-board has a PA and check its output power before adding it. Adding one means
-adding an entry to `merge/md.json`; the CI matrix is generated from that file.
+The SDK compiles satellite support for `xiao_mg24` as well, but SDK support
+alone is not sufficient — confirm the board has a PA and check its output power
+before adding it. Adding one means adding an entry to `merge/md.json`; the CI
+matrix is generated from that file.
+
+Nordic Thingy:53 also runs this application, on its network core, but is built
+with the nRF Connect SDK: see `firmware/sat-ncs`.

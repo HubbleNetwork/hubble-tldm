@@ -28,7 +28,7 @@ env:
   ZEPHYR_SDK_VERSION_TI: "0.16.9"
 
   # Add new build workspaces here. Each workspace needs a build job below.
-  WORKSPACES: '["zephyr","ti-zephyr","sat-zephyr","sat-freertos-ti","sat-esp-idf"]'
+  WORKSPACES: '["zephyr","ti-zephyr","sat-zephyr","sat-ncs","sat-freertos-ti","sat-esp-idf"]'
 
 jobs:
   setup-matrix:
@@ -58,6 +58,21 @@ jobs:
             echo "::error::merge/md.json has entries with unknown workspace (expected one of $WORKSPACES): $unknown"
             exit 1
           fi
+
+      # sat-ncs builds the satellite application from sat-zephyr, so both
+      # workspaces must compile it against the same SDK.
+      - name: Check satellite workspaces pin the same Hubble SDK
+        run: |
+          sdk_pin() {
+            yq '.manifest.projects[] | select(.name == "hubblenetwork-sdk") | .revision' "$1"
+          }
+          zephyr_pin=$(sdk_pin firmware/sat-zephyr/hubble-sat-app/west.yml)
+          ncs_pin=$(sdk_pin firmware/sat-ncs/hubble-sat-app/west.yml)
+          if [ -z "$zephyr_pin" ] || [ "$zephyr_pin" != "$ncs_pin" ]; then
+            echo "::error::hubblenetwork-sdk pins differ: sat-zephyr '$zephyr_pin', sat-ncs '$ncs_pin'"
+            exit 1
+          fi
+          echo "hubblenetwork-sdk pinned to $zephyr_pin in both workspaces"
 
       - name: Build matrices from md.json
         id: matrix
@@ -221,6 +236,73 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  build-sat-ncs:
+    needs: setup-matrix
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        board: ${{ fromJSON(needs.setup-matrix.outputs.matrix)['sat-ncs'] }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - uses: zephyrproject-rtos/action-zephyr-setup@v1
+        with:
+          app-path: hubble-sat-app
+          base-path: firmware/sat-ncs
+          toolchains: arm-zephyr-eabi
+
+      # NCS sysbuild signs and packages the images with tools from NCS and
+      # MCUboot, beyond what Zephyr's requirements cover.
+      - name: Install NCS build requirements
+        working-directory: firmware/sat-ncs
+        run: |
+          pip install -r nrf/scripts/requirements-build.txt
+          pip install -r bootloader/mcuboot/scripts/requirements.txt
+
+      - name: Fetch satellite blobs
+        working-directory: firmware/sat-ncs
+        run: west blobs fetch hubblenetwork-sdk
+
+      # The application to build for a board is hubble-sat-app/<board>. It runs
+      # the satellite application from firmware/sat-zephyr as the network core
+      # image, cpunet, whose ELF is published since it holds master_key.
+      # Besides the ELF, this publishes <artifact>.zip: every image, signed for
+      # the board's MCUboot, with a manifest of their slots. hubbledemo patches
+      # the key into the image md.json names and re-signs it.
+      - name: Build firmware
+        id: build
+        working-directory: firmware/sat-ncs
+        env:
+          BOARD_TARGET: ${{ matrix.board.board_target }}
+          ARTIFACT: ${{ matrix.board.artifact }}
+        run: |
+          APP="${BOARD_TARGET%%/*}"
+          west build -b "$BOARD_TARGET" -p always --sysbuild "hubble-sat-app/$APP"
+          cp build/cpunet/zephyr/zephyr.elf "$GITHUB_WORKSPACE/$ARTIFACT"
+          cp build/dfu_application.zip "$GITHUB_WORKSPACE/${ARTIFACT%.elf}.zip"
+          echo "zip=${ARTIFACT%.elf}.zip" >> "$GITHUB_OUTPUT"
+
+      - name: Verify ELF symbols
+        env:
+          ARTIFACT: ${{ matrix.board.artifact }}
+        run: python .github/scripts/verify-firmware-elf.py "$ARTIFACT"
+
+      - name: Upload ELF and images
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware-elfs-${{ matrix.board.key }}
+          path: |
+            ${{ matrix.board.artifact }}
+            ${{ steps.build.outputs.zip }}
+          if-no-files-found: error
+          retention-days: 14
+
   build-sat-freertos-ti:
     needs: setup-matrix
     runs-on: ubuntu-latest
@@ -334,7 +416,7 @@ jobs:
           retention-days: 14
 
   open-pr:
-    needs: [build-zephyr, build-ti-zephyr, build-sat-zephyr, build-sat-freertos-ti, build-sat-esp-idf]
+    needs: [build-zephyr, build-ti-zephyr, build-sat-zephyr, build-sat-ncs, build-sat-freertos-ti, build-sat-esp-idf]
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.deploy }}
     runs-on: ubuntu-latest
     permissions:
@@ -370,7 +452,7 @@ jobs:
             jq -r 'to_entries[] | "- `\(.key)` (\(.value.workspace)) → `\(.value.artifact)`"' merge/md.json
             echo
             echo "**Reviewer checklist** — merging publishes new firmware to every \`pyhubbledemo\` user:"
-            echo "- [ ] Diff contains only \`merge/*.elf\` and \`merge/*.bin\` changes"
+            echo "- [ ] Diff contains only \`merge/*.elf\`, \`merge/*.bin\` and \`merge/*.zip\` changes"
             echo "- [ ] Spot-check at least one ELF locally with \`hubbledemo flash\` against real hardware"
             echo "- [ ] Confirm SDK versions in workflow match the intended release toolchain"
             echo "PR_EOF"
@@ -385,5 +467,6 @@ jobs:
           add-paths: |
             merge/*.elf
             merge/*.bin
+            merge/*.zip
           commit-message: "chore(merge): rebuild firmware ELFs from workflow ${{ github.run_id }}"
           delete-branch: true

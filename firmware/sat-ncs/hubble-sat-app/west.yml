@@ -1,0 +1,50 @@
+# Copyright (c) 2026 HubbleNetwork
+# SPDX-License-Identifier: Apache-2.0
+#
+# nRF Connect SDK workspace for the satellite application. Its only board is
+# currently Nordic Thingy:53, which is flashed through the MCUboot it ships
+# with. Only NCS can build the network core images that MCUboot hands to the
+# network core bootloader. The network core runs the satellite application from
+# ../sat-zephyr.
+
+manifest:
+
+  remotes:
+    - name: ncs
+      url-base: https://github.com/nrfconnect
+    - name: hubble
+      url-base: https://github.com/HubbleNetwork
+
+  projects:
+    - name: nrf
+      remote: ncs
+      repo-path: sdk-nrf
+      revision: v3.4.0
+      import:
+        name-allowlist:
+          - cmsis
+          - cmsis_6
+          - hal_nordic
+          - libmetal
+          - mbedtls
+          - mcuboot
+          - mldsa-native
+          - nrfxlib
+          - oberon-psa-crypto
+          - open-amp
+          - picolibc
+          - segger
+          - tf-psa-crypto
+          - trusted-firmware-m
+          - zcbor
+          - zephyr
+    - name: hubblenetwork-sdk
+      repo-path: sdk
+      # Must match the pin in firmware/sat-zephyr/hubble-sat-app/west.yml,
+      # whose application this workspace builds; CI checks this.
+      revision: v3.1.0
+      path: modules/lib/hubblenetwork-sdk
+      remote: hubble
+
+  self:
+    path: hubble-sat-app

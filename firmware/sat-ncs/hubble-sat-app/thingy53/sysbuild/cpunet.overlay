@@ -1,0 +1,12 @@
+/*
+ * Copyright (c) 2026 HubbleNetwork
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Network core image (the satellite application): drive the nRF21540 FEM
+ * around each transmission. Sysbuild uses this file instead of the
+ * application's own board overlays, which it has none of for this board.
+ */
+
+&radio {
+	fem = <&nrf_radio_fem>;
+};

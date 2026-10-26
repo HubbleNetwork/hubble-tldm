@@ -25,6 +25,8 @@ manifest:
       # its last 6 data symbols overwritten by Reed-Solomon parity and cannot
       # be decoded or decrypted by the ground station. Do not move this pin
       # below v3.0.0.
+      # Must match the pin in firmware/sat-ncs/hubble-sat-app/west.yml, which
+      # builds this application too; CI checks this.
       revision: v3.1.0
       path: modules/lib/hubblenetwork-sdk
       remote: hubble

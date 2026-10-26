@@ -1,0 +1,34 @@
+# Copyright (c) 2026 HubbleNetwork
+# SPDX-License-Identifier: Apache-2.0
+#
+# Nordic Thingy:53, built from firmware/sat-ncs:
+#
+#   west build -b thingy53/nrf5340/cpuapp --sysbuild hubble-sat-app/thingy53
+#
+# The board enables MCUboot, the b0n network core bootloader and network core
+# updates, and adds an empty network core image; make that image the satellite
+# application from firmware/sat-zephyr (sysbuild/cpunet.overlay enables its
+# FEM). The images are then flashed over USB through the MCUboot that
+# Thingy:53 ships with. These defaults must come before the NCS definitions
+# sourced below.
+
+config NETCORE_IMAGE_NAME
+	string
+	default "cpunet" if NETCORE_EMPTY
+
+config NETCORE_IMAGE_PATH
+	string
+	default "$(APP_DIR)/../../../sat-zephyr/hubble-sat-app/app" if NETCORE_EMPTY
+
+# The board's static partition map, which matches the factory MCUboot, is only
+# applied with Partition Manager.
+config PARTITION_MANAGER
+	bool
+	default y
+
+# The factory MCUboot verifies RSA signatures.
+choice BOOT_SIGNATURE_TYPE
+	default BOOT_SIGNATURE_TYPE_RSA
+endchoice
+
+source "share/sysbuild/Kconfig"

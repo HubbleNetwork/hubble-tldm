@@ -1,0 +1,6 @@
+.west/
+bootloader/
+modules/
+nrf/
+nrfxlib/
+zephyr/
