@@ -19,6 +19,7 @@ classifiers = [
 ]
 dependencies = [
   "click",
+  "cryptography",
   "esptool>=5.0.2,<6",
   "petname",
   "pylink-square",
@@ -27,6 +28,7 @@ dependencies = [
   "pyhubblenetwork>=0.14.0",
   "pyserial",
   "requests",
+  "smpclient[serial]>=7.3,<8",
 ]
 
 [project.scripts]
