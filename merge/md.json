@@ -31,6 +31,15 @@
         "board_target": "nrf21540dk/nrf52840",
         "artifact": "nrf21540dk_sat.elf"
     },
+    "thingy53_sat": {
+        "name": "Nordic Thingy:53 (Satellite)",
+        "method": "mcuboot-serial",
+        "mcuboot_usb_id": "1915:5300",
+        "mcuboot_key_image": 1,
+        "workspace": "sat-ncs",
+        "board_target": "thingy53/nrf5340/cpuapp",
+        "artifact": "thingy53_sat.elf"
+    },
     "nrf54l15dk": {
         "name": "Nordic nRF54L15 Development Kit",
         "method": "jlink-flash",

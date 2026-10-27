@@ -40,6 +40,10 @@ def _get_org_and_token(org_id, token) -> tuple[str, str]:
     return org_id, token
 
 
+def _upload_progress(name: str, done: int, total: int) -> None:
+    click.echo(f"\r\t{name}: {done * 100 // total}%", nl=done == total)
+
+
 @click.group(context_settings={"help_option_names": ["-h", "--help"]})
 def cli() -> None:
     """Hubble SDK CLI."""
@@ -121,6 +125,34 @@ def flash(board: str, name: str = None, file: str = None, org_id: str = None, to
             return 2
         click.secho(f"[SUCCESS] Found {chip} on {port}")
 
+    if metadata[board]["method"] == "mcuboot-serial":
+        port = hubbledemo.find_mcuboot_device(metadata[board]["mcuboot_usb_id"])
+        if port is None:
+            click.secho(
+                "[ERROR] No board in MCUboot serial recovery found. On Thingy:53, remove "
+                "the top cover, hold SW2 and switch SW1 on.",
+                fg="red",
+                err=True,
+            )
+            return 2
+        click.secho(f"[SUCCESS] Found MCUboot serial recovery on {port}")
+
+        # MCUboot boards flash the signed images in a DFU zip; the ELF only
+        # locates the key in the image that holds it, mcuboot_key_image. Check
+        # that image before a device is registered for it.
+        click.secho(f"[INFO] Retrieving binary and images for {board}... ", nl=False)
+        elf = hubbledemo.fetch_artifact(board=board, ext="elf")
+        images = hubbledemo.read_dfu_zip(hubbledemo.fetch_artifact(board=board, ext="zip").getvalue())
+        click.secho("[SUCCESS]")
+
+        click.secho("[INFO] Checking images... ", nl=False)
+        key_offset, expected = hubbledemo.locate_mcuboot_key(elf)
+        key_image = metadata[board]["mcuboot_key_image"]
+        if key_image not in images:
+            raise ValueError(f"DFU zip has no image {key_image!r} (mcuboot_key_image) to hold the key")
+        hubbledemo.check_mcuboot_image(images[key_image][2], key_offset, expected)
+        click.secho("[SUCCESS]")
+
     device_key = os.getenv("HUBBLE_DEVICE_KEY")
     device_name = name if name else petname.generate(words=3)
 
@@ -172,6 +204,19 @@ def flash(board: str, name: str = None, file: str = None, org_id: str = None, to
         # esptool reports its own progress, so this line is not left open.
         click.secho(f"[INFO] Flashing image onto device on {port}...")
         hubbledemo.flash_esp_image(image, port=port)
+        click.secho("[SUCCESS]")
+
+        click.secho(f"\n{board} successfully flashed and provisioned!")
+        return 0
+
+    if metadata[board]["method"] == "mcuboot-serial":
+        click.secho("[INFO] Patching key into image and re-signing it... ", nl=False)
+        slot, file_name, image = images[key_image]
+        images[key_image] = (slot, file_name, hubbledemo.patch_mcuboot_image(image, key_offset, expected, device.key))
+        click.secho("[SUCCESS]")
+
+        click.secho(f"[INFO] Flashing images onto device on {port}...")
+        hubbledemo.flash_mcuboot_images(list(images.values()), port=port, progress=_upload_progress)
         click.secho("[SUCCESS]")
 
         click.secho(f"\n{board} successfully flashed and provisioned!")
